@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "charm-themes"
 description = "Sistema de temas unificado para lipgloss e componentes de terminal."
 version.workspace = true
@@ -15,9 +15,13 @@ readme = "README.md"
 [dependencies]
 charm-core.workspace = true
 lipgloss.workspace = true
+serde.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 charm-parity = { path = "../../tools/parity" }
+serde_json.workspace = true
 
 [lints]
 workspace = true
+

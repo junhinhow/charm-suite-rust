@@ -224,3 +224,41 @@ pub fn themes() -> BTreeMap<&'static str, Theme> {
     map.insert("tokyo-night", tokyo_night());
     map
 }
+
+/// Returns a copy of the built-in theme named `name`, or `None` when there is none.
+///
+/// The lookup ignores letter case and surrounding whitespace, like the Go `Get`.
+///
+/// # Examples
+///
+/// ```
+/// use charm_themes::themes;
+///
+/// assert_eq!(themes::get("  NORD ").map(|t| t.name), Some("nord".to_owned()));
+/// assert!(themes::get("missing").is_none());
+/// ```
+pub fn get(name: &str) -> Option<Theme> {
+    match name.trim().to_lowercase().as_str() {
+        "gruvbox" => Some(gruvbox()),
+        "dracula" => Some(dracula()),
+        "nord" => Some(nord()),
+        "catppuccin" => Some(catppuccin()),
+        "tokyo-night" => Some(tokyo_night()),
+        _ => None,
+    }
+}
+
+/// Returns the names of the built-in themes in alphabetical order.
+///
+/// Unlike the keys of [`themes`], the order is deterministic by contract.
+///
+/// # Examples
+///
+/// ```
+/// use charm_themes::themes;
+///
+/// assert_eq!(themes::theme_names().first(), Some(&"catppuccin"));
+/// ```
+pub fn theme_names() -> Vec<&'static str> {
+    vec!["catppuccin", "dracula", "gruvbox", "nord", "tokyo-night"]
+}

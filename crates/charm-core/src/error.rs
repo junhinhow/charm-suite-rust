@@ -13,6 +13,10 @@ pub enum Error {
     #[error("invalid color value: {0}")]
     InvalidColor(String),
 
+    /// Valor hexadecimal invalido (formato nao reconhecido).
+    #[error("color: valor hexadecimal invalido: {0}")]
+    InvalidHex(String),
+
     /// Erro de entrada/saida.
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),

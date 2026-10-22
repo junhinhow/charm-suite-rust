@@ -1,7 +1,17 @@
 //! Theme and syntax-highlighting color definitions.
 
+use crate::bubbles::BubblesStyles;
+use crate::glamour::StyleConfig;
 use crate::lipgloss::LipglossStyles;
 use charm_core::Rgb;
+
+/// Error returned by [`Theme::validate`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ThemeError {
+    /// The theme has no name, or only whitespace as its name.
+    #[error("theme name is empty")]
+    MissingName,
+}
 
 /// A complete color palette that can be applied across terminal UI code.
 ///
@@ -120,6 +130,93 @@ impl Theme {
     /// ```
     pub fn lipgloss(&self) -> LipglossStyles {
         LipglossStyles::from_theme(self)
+    }
+
+    /// Derives the styles of the `bubbles` components from this theme.
+    ///
+    /// Mirrors `Theme.Bubbles()` of the Go implementation. Each call builds
+    /// new styles, so call it once and reuse the result.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_themes::themes;
+    ///
+    /// let styles = themes::nord().bubbles();
+    /// let header = styles.table.header.render("ID");
+    /// assert!(charm_core::strip_ansi(&header).contains("ID"));
+    /// ```
+    pub fn bubbles(&self) -> BubblesStyles {
+        BubblesStyles::from_theme(self)
+    }
+
+    /// Derives the `glamour` markdown style configuration from this theme.
+    ///
+    /// Mirrors `Theme.Glamour()` of the Go implementation. The result is
+    /// plain data that serializes to the same JSON layout as the Go
+    /// `ansi.StyleConfig`. This crate does not render markdown itself.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_themes::themes;
+    ///
+    /// let config = themes::nord().glamour();
+    /// assert_eq!(config.heading.primitive.color.as_deref(), Some("#88c0d0"));
+    /// ```
+    pub fn glamour(&self) -> StyleConfig {
+        StyleConfig::from_theme(self)
+    }
+
+    /// Checks that the theme is complete enough to be used.
+    ///
+    /// Every color of a [`Theme`] is typed, so the only way to build an
+    /// incomplete theme is to leave the name empty. The Go `Validate` also
+    /// reports missing colors; in Rust that case cannot happen.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ThemeError::MissingName`] when the name is empty or blank.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_themes::{Theme, ThemeError, themes};
+    ///
+    /// assert!(themes::nord().validate().is_ok());
+    ///
+    /// let mut theme = themes::nord();
+    /// theme.name = "  ".to_owned();
+    /// assert_eq!(theme.validate(), Err(ThemeError::MissingName));
+    /// ```
+    pub fn validate(&self) -> Result<(), ThemeError> {
+        if self.name.trim().is_empty() {
+            return Err(ThemeError::MissingName);
+        }
+        Ok(())
+    }
+}
+
+impl SyntaxColors {
+    /// Checks the syntax palette, mirroring the Go `SyntaxColors.Validate`.
+    ///
+    /// Always succeeds: every syntax color is a typed [`Rgb`], so none can be
+    /// missing. The method exists so that code written against the Go API
+    /// keeps compiling.
+    ///
+    /// # Errors
+    ///
+    /// Never returns an error in this implementation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_themes::themes;
+    ///
+    /// assert!(themes::nord().syntax.validate().is_ok());
+    /// ```
+    pub fn validate(&self) -> Result<(), ThemeError> {
+        Ok(())
     }
 }
 

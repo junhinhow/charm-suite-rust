@@ -339,6 +339,9 @@ dependencies = [
  "charm-core",
  "charm-parity",
  "lipgloss",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

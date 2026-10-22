@@ -191,6 +191,48 @@ foreach ($key in $Meta.Keys) {
 }
 Add-Line '    map'
 Add-Line '}'
+Add-Line ''
+
+Add-Line '/// Returns a copy of the built-in theme named `name`, or `None` when there is none.'
+Add-Line '///'
+Add-Line '/// The lookup ignores letter case and surrounding whitespace, like the Go `Get`.'
+Add-Line '///'
+Add-Line '/// # Examples'
+Add-Line '///'
+Add-Line '/// ```'
+Add-Line '/// use charm_themes::themes;'
+Add-Line '///'
+Add-Line '/// assert_eq!(themes::get("  NORD ").map(|t| t.name), Some("nord".to_owned()));'
+Add-Line '/// assert!(themes::get("missing").is_none());'
+Add-Line '/// ```'
+Add-Line 'pub fn get(name: &str) -> Option<Theme> {'
+Add-Line '    match name.trim().to_lowercase().as_str() {'
+foreach ($key in $Meta.Keys) {
+    $metaInfo = $Meta[$key]
+    $themeData = $Parsed[$key]
+    Add-Line ('        "{0}" => Some({1}()),' -f $themeData.Name, $metaInfo.Fn)
+}
+Add-Line '        _ => None,'
+Add-Line '    }'
+Add-Line '}'
+Add-Line ''
+
+$sortedNames = [string[]]@($Meta.Keys | ForEach-Object { $Parsed[$_].Name })
+[Array]::Sort($sortedNames, [StringComparer]::Ordinal)
+Add-Line '/// Returns the names of the built-in themes in alphabetical order.'
+Add-Line '///'
+Add-Line '/// Unlike the keys of [`themes`], the order is deterministic by contract.'
+Add-Line '///'
+Add-Line '/// # Examples'
+Add-Line '///'
+Add-Line '/// ```'
+Add-Line '/// use charm_themes::themes;'
+Add-Line '///'
+Add-Line '/// assert_eq!(themes::theme_names().first(), Some(&"catppuccin"));'
+Add-Line '/// ```'
+Add-Line 'pub fn theme_names() -> Vec<&''static str> {'
+Add-Line ('    vec![{0}]' -f (($sortedNames | ForEach-Object { '"{0}"' -f $_ }) -join ', '))
+Add-Line '}'
 
 $outDir = Split-Path -Parent $OutFile
 if (-not (Test-Path -LiteralPath $outDir)) {

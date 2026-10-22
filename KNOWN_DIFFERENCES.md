@@ -61,6 +61,8 @@ Legenda da coluna **Impacto**: o que muda para quem usa a biblioteca ou a CLI.
 | `charm-notify` | Usa `NotifyOptions` no lugar do builder previsto no roadmap | Espelha as funções `Option` do Go | Nenhum para quem segue a documentação |
 | `charm-notify` | Linux sem `notify-send`: a mensagem de erro não traz a dica de instalação (a dica está na tabela do README) | Mensagens de erro simples | Menos orientação no próprio erro |
 | `charm-notify` | Depende de binários externos: `notify-send`, `osascript`, `powershell` ou `msg` | O Go também invoca processos; não há bindings nativos | Testes validam o comando montado, não o envio real |
+| `charm-notify` | `platform()` retorna `Option<&str>` (`None` onde o Go retorna `""`); `Capabilities` usa campos `bool` | Tipo idiomático em Rust | Quem comparava com `""` precisa ajustar |
+| `charm-notify` | `Error::ProcessFailed` traz `program` e `stderr`; o `CommandError` do Go também guarda `Args`, que o Rust não mantém | Forma do enum de erro | Argumentos do comando não aparecem na mensagem de erro |
 | `charm-test` | `Simulator::messages()` retorna `MessageRecord` (diagnóstico), não o `Message` consumido | `Message` não implementa `Clone` e é consumido por `update` | Tipo diferente; valores aparecem como `Debug` |
 | `charm-test` | O tipo concreto do payload é apagado pelo runtime; os registros identificam só tipos embutidos conhecidos | `charmed-bubbletea` usa mensagens com tipo apagado | Nomes e valores podem diferir de `%T` e `%v` do Go |
 | `charm-test` | Teclas desconhecidas com múltiplos caracteres preservam os runes | `KeyMsg` não tem campo equivalente ao `Text` da mensagem sem código do Go | Comportamento distinto em teclas não mapeadas |

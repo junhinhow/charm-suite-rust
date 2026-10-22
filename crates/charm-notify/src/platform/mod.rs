@@ -1,12 +1,18 @@
-//! Platform backends. Exactly one of the submodules is compiled for the target.
+//! Platform backends. Exactly one backend sends notifications on the target.
+//!
+//! The command builders of every backend are also compiled under `cfg(test)`,
+//! so their command construction is tested on any host, not only on the
+//! platform the backend targets.
 
-#[cfg(target_os = "linux")]
+use crate::Capabilities;
+
+#[cfg(any(target_os = "linux", test))]
 mod linux;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", test))]
 mod macos;
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 mod other;
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", test))]
 mod windows;
 
 #[cfg(target_os = "linux")]
@@ -18,6 +24,48 @@ pub(crate) use other::send;
 #[cfg(target_os = "windows")]
 pub(crate) use windows::send;
 
+/// Platform identifier reported by [`crate::platform`].
+#[cfg(target_os = "linux")]
+pub(crate) const PLATFORM: Option<&str> = Some("linux");
+/// Platform identifier reported by [`crate::platform`].
+#[cfg(target_os = "macos")]
+pub(crate) const PLATFORM: Option<&str> = Some("darwin");
+/// Platform identifier reported by [`crate::platform`].
+#[cfg(target_os = "windows")]
+pub(crate) const PLATFORM: Option<&str> = Some("windows");
+/// Platform identifier reported by [`crate::platform`].
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub(crate) const PLATFORM: Option<&str> = None;
+
+/// Options honoured by the current backend.
+#[cfg(target_os = "linux")]
+pub(crate) const CAPABILITIES: Capabilities = Capabilities {
+    icon: true,
+    sound: false,
+    timeout: true,
+};
+/// Options honoured by the current backend.
+#[cfg(target_os = "macos")]
+pub(crate) const CAPABILITIES: Capabilities = Capabilities {
+    icon: false,
+    sound: true,
+    timeout: false,
+};
+/// Options honoured by the current backend.
+#[cfg(target_os = "windows")]
+pub(crate) const CAPABILITIES: Capabilities = Capabilities {
+    icon: true,
+    sound: true,
+    timeout: true,
+};
+/// Options honoured by the current backend.
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+pub(crate) const CAPABILITIES: Capabilities = Capabilities {
+    icon: false,
+    sound: false,
+    timeout: false,
+};
+
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 use std::process::{Command, Stdio};
 
@@ -27,8 +75,9 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Runs an external program and waits for it to finish.
 ///
-/// Standard streams are discarded, as the Go original does. A missing program
-/// is reported as [`Error::BinaryNotFound`](crate::Error::BinaryNotFound).
+/// Standard output and input are discarded; standard error is captured and
+/// reported in [`Error::ProcessFailed`](crate::Error::ProcessFailed). A missing
+/// program is reported as [`Error::BinaryNotFound`](crate::Error::BinaryNotFound).
 #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
 pub(crate) fn run_command(mut command: Command) -> Result<(), crate::Error> {
     #[cfg(target_os = "windows")]
@@ -39,18 +88,39 @@ pub(crate) fn run_command(mut command: Command) -> Result<(), crate::Error> {
     command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stderr(Stdio::piped());
 
     let program = command.get_program().to_string_lossy().into_owned();
-    match command.status() {
-        Ok(status) if status.success() => Ok(()),
-        Ok(_) => Err(crate::Error::ProcessFailed { program }),
+    match command.output() {
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => Err(crate::Error::ProcessFailed {
+            program,
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        }),
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
             Err(crate::Error::BinaryNotFound { binary: program })
         }
         Err(source) => Err(crate::Error::Spawn { program, source }),
     }
 }
+
+/// Texts that try to break out of a quoted literal in a generated command.
+#[cfg(test)]
+pub(crate) const ADVERSARIAL_PAYLOADS: &[&str] = &[
+    "\"",
+    "\"\"",
+    "\" ; do shell script \"rm -rf /\" ; \"",
+    "$(whoami)",
+    "`whoami`",
+    "'; rm -rf / ; '",
+    "\"; rm -rf / ; \"",
+    "\\",
+    "\\\\",
+    "\\n",
+    "a\"b'c$d;e|f&g",
+    "linha1\nlinha2",
+    "linha1\rlinha2",
+];
 
 #[cfg(all(
     test,
@@ -84,6 +154,32 @@ mod tests {
         };
 
         let err = run_command(command).unwrap_err();
-        assert!(matches!(err, Error::ProcessFailed { .. }));
+        assert!(
+            matches!(err, Error::ProcessFailed { ref stderr, .. } if stderr.is_empty()),
+            "unexpected error: {err:?}"
+        );
+    }
+
+    #[test]
+    fn captures_stderr_of_a_failed_command() {
+        #[cfg(windows)]
+        let command = {
+            let mut command = Command::new("cmd");
+            command.args(["/C", "echo detalhe do erro 1>&2 & exit 1"]);
+            command
+        };
+        #[cfg(not(windows))]
+        let command = {
+            let mut command = Command::new("sh");
+            command.args(["-c", "echo detalhe do erro >&2; exit 1"]);
+            command
+        };
+
+        let err = run_command(command).unwrap_err();
+        let Error::ProcessFailed { stderr, .. } = &err else {
+            panic!("expected ProcessFailed, got {err:?}");
+        };
+        assert!(stderr.contains("detalhe do erro"), "stderr was {stderr:?}");
+        assert!(err.to_string().contains("detalhe do erro"));
     }
 }

@@ -1,22 +1,27 @@
 //! Linux backend: `notify-send` from `libnotify`.
 
-use std::path::PathBuf;
 use std::process::Command;
 
+#[cfg(target_os = "linux")]
 use super::run_command;
-use crate::{Error, Notification};
+#[cfg(target_os = "linux")]
+use crate::Error;
+use crate::Notification;
 
 /// Name of the program that shows the notification.
 const PROGRAM: &str = "notify-send";
 
 /// Sends the notification with `notify-send`.
 ///
+/// The icon and the expiry time are sent only when set. `notify-send` has no
+/// sound option, so [`Notification::sound`] is ignored.
+///
 /// # Errors
 ///
 /// Returns [`Error::BinaryNotFound`] when `notify-send` is not in `PATH`,
 /// which usually means `libnotify` is not installed.
+#[cfg(target_os = "linux")]
 pub(crate) fn send(notification: &Notification) -> Result<(), Error> {
-    find_in_path(PROGRAM)?;
     run_command(build_command(notification))
 }
 
@@ -35,19 +40,6 @@ pub(crate) fn build_command(notification: &Notification) -> Command {
         ));
     }
     command
-}
-
-/// Looks for `binary` in every directory listed in `PATH`.
-fn find_in_path(binary: &str) -> Result<PathBuf, Error> {
-    std::env::var_os("PATH")
-        .and_then(|paths| {
-            std::env::split_paths(&paths)
-                .map(|dir| dir.join(binary))
-                .find(|candidate| candidate.is_file())
-        })
-        .ok_or_else(|| Error::BinaryNotFound {
-            binary: binary.to_owned(),
-        })
 }
 
 #[cfg(test)]
@@ -96,6 +88,12 @@ mod tests {
     }
 
     #[test]
+    fn omits_expire_time_for_zero_timeout() {
+        let command = build_command(&sample("", Duration::ZERO));
+        assert!(!args_of(&command).iter().any(|arg| arg.starts_with("--expire-time")));
+    }
+
+    #[test]
     fn orders_icon_before_expire_time() {
         let command = build_command(&sample("ico", Duration::from_secs(5)));
         assert_eq!(
@@ -105,15 +103,17 @@ mod tests {
     }
 
     #[test]
-    fn missing_binary_is_detected_with_a_clear_error() {
-        let err = find_in_path("charm-notify-no-such-binary").unwrap_err();
-        assert!(
-            matches!(err, Error::BinaryNotFound { ref binary } if binary == "charm-notify-no-such-binary")
-        );
+    fn ignores_sound_because_notify_send_has_no_option_for_it() {
+        let mut notification = sample("", Duration::ZERO);
+        notification.sound = true;
+        assert_eq!(args_of(&build_command(&notification)), ["Build", "passed"]);
     }
 
     #[test]
-    fn finds_an_existing_binary_in_path() {
-        assert!(find_in_path("sh").is_ok());
+    fn keeps_shell_metacharacters_as_plain_arguments() {
+        let mut notification = sample("", Duration::ZERO);
+        notification.message = "$(whoami); `id` \"x\"".to_owned();
+        let command = build_command(&notification);
+        assert_eq!(args_of(&command)[1], "$(whoami); `id` \"x\"");
     }
 }
