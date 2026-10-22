@@ -15,6 +15,7 @@ readme = "README.md"
 [dependencies]
 charm-core.workspace = true
 lipgloss.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 charm-parity = { path = "../../tools/parity" }

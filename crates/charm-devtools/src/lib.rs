@@ -31,6 +31,7 @@ mod inspector;
 
 use std::any::type_name;
 use std::collections::VecDeque;
+use std::sync::{Mutex, MutexGuard};
 use std::time::SystemTime;
 
 use charmed_bubbletea::{Cmd, KeyMsg, KeyType, Message, Model, WindowSizeMsg};
@@ -38,6 +39,8 @@ use charmed_bubbletea::{Cmd, KeyMsg, KeyType, Message, Model, WindowSizeMsg};
 pub use inspector::INSPECTOR_TOGGLE_KEY;
 
 const MAX_MESSAGES: usize = 100;
+const REFRESH_INTERVAL: usize = 25;
+const MAX_COMPONENT_DEPTH: usize = 16;
 
 /// One intercepted message with its receipt time and diagnostic representation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +62,8 @@ pub struct ComponentNode {
     pub type_name: String,
     /// Nested components in display order.
     pub children: Vec<ComponentNode>,
+    /// Whether this node closes a component reference cycle.
+    pub cycle: bool,
 }
 
 impl ComponentNode {
@@ -83,6 +88,7 @@ impl ComponentNode {
             name,
             type_name,
             children: Vec::new(),
+            cycle: false,
         }
     }
 
@@ -92,7 +98,15 @@ impl ComponentNode {
             name: name.into(),
             type_name: type_name.into(),
             children,
+            cycle: false,
         }
+    }
+
+    /// Mark this node as the boundary of a component cycle.
+    #[must_use]
+    pub fn with_cycle(mut self, cycle: bool) -> Self {
+        self.cycle = cycle;
+        self
     }
 }
 
@@ -112,18 +126,29 @@ impl ComponentNode {
 /// assert_eq!(Screen.inspect().children.len(), 1);
 /// ```
 pub trait DevInspect {
+    /// Return an optional custom display name for this model.
+    fn name(&self) -> Option<&str> {
+        None
+    }
+
     /// Return this model's component description.
     fn inspect(&self) -> ComponentNode {
-        ComponentNode::root(type_name::<Self>())
+        let mut node = ComponentNode::root(type_name::<Self>());
+        if let Some(name) = self.name().filter(|name| !name.is_empty()) {
+            name.clone_into(&mut node.name);
+        }
+        node
     }
 }
 
 /// State observed by the development middleware.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct DevState {
     messages: VecDeque<MessageEntry>,
     current_state: String,
     components: Vec<ComponentNode>,
+    dirty: bool,
+    refreshes: usize,
 }
 
 impl DevState {
@@ -142,11 +167,23 @@ impl DevState {
         &self.components
     }
 
+    /// Return how many times the state and component snapshot has been refreshed.
+    pub fn refresh_count(&self) -> usize {
+        self.refreshes
+    }
+
     fn record(&mut self, message: &Message) {
+        let (type_name, value) = if let Some(key) = message.downcast_ref::<KeyMsg>() {
+            (type_name::<KeyMsg>().to_owned(), format!("{key:?}"))
+        } else if let Some(size) = message.downcast_ref::<WindowSizeMsg>() {
+            (type_name::<WindowSizeMsg>().to_owned(), format!("{size:?}"))
+        } else {
+            (type_name::<Message>().to_owned(), format!("{message:?}"))
+        };
         let entry = MessageEntry {
             timestamp: SystemTime::now(),
-            type_name: message_type_name(message).to_owned(),
-            value: format!("{message:?}"),
+            type_name,
+            value,
         };
         self.push_entry(entry);
     }
@@ -162,16 +199,12 @@ impl DevState {
         self.current_state = current_state;
         self.components.clear();
         self.components.push(components);
+        self.dirty = false;
+        self.refreshes += 1;
     }
-}
 
-fn message_type_name(message: &Message) -> &'static str {
-    if message.is::<KeyMsg>() {
-        type_name::<KeyMsg>()
-    } else if message.is::<WindowSizeMsg>() {
-        type_name::<WindowSizeMsg>()
-    } else {
-        type_name::<Message>()
+    fn mark_dirty(&mut self) {
+        self.dirty = true;
     }
 }
 
@@ -184,22 +217,24 @@ pub fn middleware<M: Model + DevInspect + 'static>(model: M) -> DevModel<M> {
 #[derive(Debug)]
 pub struct DevModel<M: Model> {
     inner: M,
-    state: DevState,
+    state: Mutex<DevState>,
     show: bool,
     panel: inspector::InspectorModel,
     inspect: fn(&M) -> ComponentNode,
+    pending: usize,
 }
 
 impl<M: Model> DevModel<M> {
     fn new(inner: M, inspect: fn(&M) -> ComponentNode) -> Self {
         let mut state = DevState::default();
-        state.capture(inner.view(), inspect(&inner));
+        state.capture(inner.view(), limit_component_depth(inspect(&inner), 0));
         Self {
             inner,
-            state,
+            state: Mutex::new(state),
             show: false,
             panel: inspector::InspectorModel::default(),
             inspect,
+            pending: 0,
         }
     }
 
@@ -209,8 +244,10 @@ impl<M: Model> DevModel<M> {
     }
 
     /// Borrow the recorded inspector state.
-    pub fn state(&self) -> &DevState {
-        &self.state
+    pub fn state(&self) -> MutexGuard<'_, DevState> {
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Borrow the wrapped model.
@@ -220,7 +257,18 @@ impl<M: Model> DevModel<M> {
 
     /// Mutably borrow the wrapped model.
     pub fn inner_mut(&mut self) -> &mut M {
+        self.state().mark_dirty();
         &mut self.inner
+    }
+
+    fn capture(&self) {
+        if !self.state().dirty {
+            return;
+        }
+        let view = self.inner.view();
+        let components = limit_component_depth((self.inspect)(&self.inner), 0);
+        let mut state = self.state();
+        state.capture(view, components);
     }
 }
 
@@ -230,30 +278,54 @@ impl<M: Model> Model for DevModel<M> {
     }
 
     fn update(&mut self, message: Message) -> Option<Cmd> {
-        self.state.record(&message);
+        {
+            let mut state = self.state();
+            state.record(&message);
+        }
         if let Some(key) = message.downcast_ref::<KeyMsg>() {
             if key.key_type == KeyType::F12 {
                 self.toggle();
+                return None;
             }
-            if self.show {
-                self.panel.update(key.key_type);
+            if self.show && matches!(key.key_type, KeyType::Up | KeyType::Down | KeyType::Tab) {
+                let state = self.state().clone();
+                self.panel.update(key.key_type, &state);
+                return None;
             }
         }
 
-        // Every message, including inspector controls, reaches the wrapped model.
         let command = self.inner.update(message);
-        self.state
-            .capture(self.inner.view(), (self.inspect)(&self.inner));
+        self.pending += 1;
+        self.state().mark_dirty();
+        if self.pending >= REFRESH_INTERVAL {
+            self.pending = 0;
+            self.capture();
+        }
         command
     }
 
     fn view(&self) -> String {
         if self.show {
-            self.panel.render(&self.state)
+            self.capture();
+            let state = self.state();
+            self.panel.render(&state)
         } else {
             self.inner.view()
         }
     }
+}
+
+fn limit_component_depth(mut node: ComponentNode, depth: usize) -> ComponentNode {
+    if node.cycle || depth >= MAX_COMPONENT_DEPTH {
+        node.children.clear();
+    } else {
+        node.children = node
+            .children
+            .into_iter()
+            .map(|child| limit_component_depth(child, depth + 1))
+            .collect();
+    }
+    node
 }
 
 #[cfg(test)]
@@ -262,7 +334,9 @@ mod tests {
 
     use charmed_bubbletea::{Cmd, KeyMsg, KeyType, Message, Model};
 
-    use super::{middleware, ComponentNode, DevInspect, DevState, MessageEntry};
+    use super::{
+        limit_component_depth, middleware, ComponentNode, DevInspect, DevState, MessageEntry,
+    };
 
     struct Counter {
         count: usize,
@@ -292,6 +366,46 @@ mod tests {
     impl DevInspect for CustomParent {
         fn inspect(&self) -> ComponentNode {
             ComponentNode::new("Parent", "Parent", vec![ComponentNode::root("Child")])
+        }
+    }
+
+    struct NamedModel;
+    impl DevInspect for NamedModel {
+        fn name(&self) -> Option<&str> {
+            Some("Named")
+        }
+    }
+
+    struct ChangingModel(usize);
+    impl Model for ChangingModel {
+        fn init(&self) -> Option<Cmd> {
+            None
+        }
+        fn update(&mut self, _: Message) -> Option<Cmd> {
+            self.0 += 1;
+            None
+        }
+        fn view(&self) -> String {
+            self.0.to_string()
+        }
+    }
+    impl DevInspect for ChangingModel {}
+
+    struct DeepTree(ComponentNode);
+    impl Model for DeepTree {
+        fn init(&self) -> Option<Cmd> {
+            None
+        }
+        fn update(&mut self, _: Message) -> Option<Cmd> {
+            None
+        }
+        fn view(&self) -> String {
+            String::new()
+        }
+    }
+    impl DevInspect for DeepTree {
+        fn inspect(&self) -> ComponentNode {
+            self.0.clone()
         }
     }
 
@@ -342,10 +456,16 @@ mod tests {
         assert!(default_node.type_name.ends_with("Counter"));
 
         assert_eq!(CustomParent.inspect().children[0].name, "Child");
+        assert_eq!(NamedModel.inspect().name, "Named");
+        assert!(ComponentNode::root("Root").with_cycle(true).cycle);
+
+        let cyclic = ComponentNode::new("Cycle", "Cycle", vec![ComponentNode::root("unvisited")])
+            .with_cycle(true);
+        assert_eq!(limit_component_depth(cyclic, 0).children, Vec::new());
     }
 
     #[test]
-    fn f12_opens_panel_and_navigation_keys_still_reach_inner_model() {
+    fn f12_and_navigation_are_consumed_while_other_keys_reach_inner_model() {
         let mut wrapped = middleware(Counter {
             count: 0,
             received: 0,
@@ -353,6 +473,46 @@ mod tests {
         wrapped.update(Message::new(KeyMsg::from_type(KeyType::F12)));
         assert!(wrapped.view().contains("Bubble Tea DevTools"));
         wrapped.update(Message::new(KeyMsg::from_type(KeyType::Tab)));
-        assert_eq!(wrapped.inner().received, 2);
+        assert_eq!(wrapped.inner().received, 0);
+        wrapped.update(Message::new(KeyMsg::from_char('k')));
+        assert_eq!(wrapped.inner().received, 1);
+        assert_eq!(wrapped.inner().count, 1);
+        wrapped.update(Message::new(KeyMsg::from_type(KeyType::F12)));
+        assert_eq!(wrapped.inner().received, 1);
+    }
+
+    #[test]
+    fn snapshots_are_throttled_and_refreshed_on_visible_panel_render() {
+        let mut wrapped = middleware(ChangingModel(0));
+        let initial_refreshes = wrapped.state().refresh_count();
+        for _ in 0..24 {
+            wrapped.update(Message::new(()));
+        }
+        assert_eq!(wrapped.state().refresh_count(), initial_refreshes);
+        assert_eq!(wrapped.state().current_state(), "0");
+
+        wrapped.update(Message::new(KeyMsg::from_type(KeyType::F12)));
+        wrapped.update(Message::new(KeyMsg::from_type(KeyType::Tab)));
+        assert!(wrapped.view().contains("Current Model State"));
+        assert_eq!(wrapped.state().current_state(), "24");
+        let refreshed = wrapped.state().refresh_count();
+        let _ = wrapped.view();
+        assert_eq!(wrapped.state().refresh_count(), refreshed);
+    }
+
+    #[test]
+    fn component_snapshots_are_limited_to_sixteen_edges() {
+        let mut node = ComponentNode::root("leaf");
+        for index in 0..24 {
+            node = ComponentNode::new(format!("node-{index}"), "Node", vec![node]);
+        }
+        let wrapped = middleware(DeepTree(node));
+        let mut node = wrapped.state().components()[0].clone();
+        let mut depth = 0;
+        while let Some(child) = node.children.first() {
+            depth += 1;
+            node = child.clone();
+        }
+        assert_eq!(depth, 16);
     }
 }

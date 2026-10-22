@@ -1,7 +1,9 @@
 //! Grid container: automatic distribution of children over equally wide columns.
 
+use crate::error::{Dimension, Error};
+use crate::geometry::{distribute, equal_weights, render_cell};
 use crate::util::{
-    as_refs, join_vertical_with_spacer, join_with_spacer, spacer_h, spacer_v, to_i32_dim, to_i64,
+    as_refs, join_vertical_with_spacer, join_with_spacer, spacer_h, spacer_v, to_i64,
 };
 
 /// A grid that distributes its children automatically into rows of equally
@@ -9,6 +11,10 @@ use crate::util::{
 ///
 /// The last row may be incomplete: the missing cells are filled with empty
 /// blocks so the alignment of the grid is preserved.
+///
+/// Configuration errors (fewer than one column, negative sizes or gaps) are
+/// recorded while the grid is built. [`render`](Self::render) always produces
+/// a valid geometry; [`try_render`](Self::try_render) reports the error.
 ///
 /// # Examples
 ///
@@ -26,28 +32,33 @@ use crate::util::{
 /// ```
 #[derive(Debug, Clone)]
 pub struct Grid {
-    /// Number of columns of the grid.
-    pub columns: usize,
+    /// Number of columns of the grid. Values below one are invalid; see
+    /// [`validate`](Self::validate).
+    pub columns: i64,
     /// Contents of the grid cells.
     pub children: Vec<String>,
     /// Spacing, in characters, inserted between two consecutive cells.
-    pub gap: usize,
+    /// Negative values are invalid; see [`validate`](Self::validate).
+    pub gap: i64,
     /// Available width of the grid.
-    width: usize,
+    width: i64,
     /// Available height of the grid.
-    height: usize,
+    height: i64,
+    /// First configuration error found by the builder methods.
+    error: Option<Error>,
 }
 
 impl Grid {
     /// Default width used by a newly created grid.
-    pub const DEFAULT_WIDTH: usize = 80;
+    pub const DEFAULT_WIDTH: i64 = 80;
     /// Default height used by a newly created grid.
-    pub const DEFAULT_HEIGHT: usize = 24;
+    pub const DEFAULT_HEIGHT: i64 = 24;
 
     /// Creates a new grid with the given number of columns.
     ///
-    /// Column counts below one are clamped to one, exactly like the Go
-    /// original.
+    /// Column counts below one are recorded as an [`Error::InvalidColumns`] and
+    /// clamped to one, exactly like the Go original. Use [`try_new`](Self::try_new)
+    /// to receive the error instead.
     ///
     /// # Examples
     ///
@@ -58,17 +69,46 @@ impl Grid {
     /// assert_eq!(Grid::new(0).columns, 1);
     /// ```
     #[must_use]
-    pub fn new(columns: usize) -> Self {
-        Self {
-            columns: columns.max(1),
+    pub fn new(columns: i64) -> Self {
+        let mut grid = Self {
+            columns,
             children: Vec::new(),
             gap: 0,
             width: Self::DEFAULT_WIDTH,
             height: Self::DEFAULT_HEIGHT,
+            error: None,
+        };
+        if columns < 1 {
+            grid.record(Error::InvalidColumns(columns));
+            grid.columns = 1;
         }
+        grid
+    }
+
+    /// Creates a new grid and reports an error when the column count is invalid.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidColumns`] when `columns` is below one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_layout::{Error, Grid};
+    ///
+    /// assert_eq!(Grid::try_new(0).unwrap_err(), Error::InvalidColumns(0));
+    /// assert!(Grid::try_new(3).is_ok());
+    /// ```
+    pub fn try_new(columns: i64) -> Result<Self, Error> {
+        let grid = Self::new(columns);
+        grid.validate()?;
+        Ok(grid)
     }
 
     /// Sets the available width and height of the grid.
+    ///
+    /// Negative values are recorded as an [`Error::InvalidSize`] and clamped to
+    /// zero when rendering.
     ///
     /// # Examples
     ///
@@ -79,13 +119,28 @@ impl Grid {
     /// assert_eq!(grid.render(), "");
     /// ```
     #[must_use]
-    pub fn set_size(mut self, width: usize, height: usize) -> Self {
+    pub fn set_size(mut self, width: i64, height: i64) -> Self {
+        if width < 0 {
+            self.record(Error::InvalidSize {
+                dimension: Dimension::Width,
+                value: width,
+            });
+        }
+        if height < 0 {
+            self.record(Error::InvalidSize {
+                dimension: Dimension::Height,
+                value: height,
+            });
+        }
         self.width = width;
         self.height = height;
         self
     }
 
     /// Sets the spacing inserted between two consecutive cells.
+    ///
+    /// A negative gap is recorded as an [`Error::InvalidGap`] and treated as
+    /// zero when rendering.
     ///
     /// # Examples
     ///
@@ -95,7 +150,10 @@ impl Grid {
     /// assert_eq!(Grid::new(2).set_gap(3).gap, 3);
     /// ```
     #[must_use]
-    pub fn set_gap(mut self, gap: usize) -> Self {
+    pub fn set_gap(mut self, gap: i64) -> Self {
+        if gap < 0 {
+            self.record(Error::InvalidGap(gap));
+        }
         self.gap = gap;
         self
     }
@@ -132,12 +190,104 @@ impl Grid {
         self
     }
 
-    /// Computes the layout and returns the composed blocks.
+    /// Returns the available width and height of the grid.
     ///
-    /// The width of a column is `(width - gap * (columns - 1)) / columns` and
-    /// the height of a row is `(height - gap * (rows - 1)) / rows`, both using
-    /// integer division. The last row is padded with empty cells so every row
-    /// keeps the same width.
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_layout::Grid;
+    ///
+    /// assert_eq!(Grid::new(2).set_size(20, 5).size(), (20, 5));
+    /// ```
+    #[must_use]
+    pub fn size(&self) -> (i64, i64) {
+        (self.width, self.height)
+    }
+
+    /// Returns the number of cells in the grid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_layout::Grid;
+    ///
+    /// assert_eq!(Grid::new(2).add_children(["a", "b"]).child_count(), 2);
+    /// ```
+    #[must_use]
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Returns a copy of the cells. Changing the copy does not affect the grid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_layout::Grid;
+    ///
+    /// let grid = Grid::new(2).add_children(["A", "B"]);
+    /// let mut copy = grid.children_copy();
+    /// copy[0] = "changed".to_string();
+    /// assert_eq!(grid.children[0], "A");
+    /// ```
+    #[must_use]
+    pub fn children_copy(&self) -> Vec<String> {
+        self.children.clone()
+    }
+
+    /// Checks the current configuration and returns the first error found.
+    ///
+    /// Errors recorded by the builder methods are reported first, then the
+    /// direct edits to the public fields are checked.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidColumns`] when there are fewer than one column,
+    /// [`Error::InvalidGap`] for a negative gap and [`Error::InvalidSize`] for a
+    /// negative width or height.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_layout::{Error, Grid};
+    ///
+    /// let mut grid = Grid::new(3);
+    /// grid.columns = 0;
+    /// assert_eq!(grid.validate(), Err(Error::InvalidColumns(0)));
+    /// ```
+    pub fn validate(&self) -> Result<(), Error> {
+        if let Some(error) = &self.error {
+            return Err(error.clone());
+        }
+        if self.columns < 1 {
+            return Err(Error::InvalidColumns(self.columns));
+        }
+        if self.gap < 0 {
+            return Err(Error::InvalidGap(self.gap));
+        }
+        if self.width < 0 {
+            return Err(Error::InvalidSize {
+                dimension: Dimension::Width,
+                value: self.width,
+            });
+        }
+        if self.height < 0 {
+            return Err(Error::InvalidSize {
+                dimension: Dimension::Height,
+                value: self.height,
+            });
+        }
+        Ok(())
+    }
+
+    /// Computes the layout of the grid and returns it as a string.
+    ///
+    /// The children are placed in rows of equally wide columns. The gap shrinks
+    /// when it does not fit the available width or height, so the grid never
+    /// grows beyond its container.
+    ///
+    /// This variant never fails: invalid configuration is clamped to a valid
+    /// geometry. Use [`try_render`](Self::try_render) to detect it.
     ///
     /// An empty grid renders as an empty string.
     ///
@@ -159,55 +309,87 @@ impl Grid {
             return String::new();
         }
 
-        // The Go original divides by `g.Columns`; a grid whose column count
-        // was set to zero would panic there. Clamping keeps the port total.
         let columns = self.columns.max(1);
+        let column_count = usize::try_from(columns).unwrap_or(usize::MAX);
+        let row_count = self.children.len().div_ceil(column_count);
+        let width = self.width.max(0);
+        let height = self.height.max(0);
 
-        let total_h_gap = self.gap.saturating_mul(columns - 1);
-        let col_width = (to_i64(self.width) - to_i64(total_h_gap)) / to_i64(columns);
+        // The gap is reduced when it fits neither the width nor the height.
+        let mut effective_gap = self.gap.max(0);
+        if columns > 1 {
+            effective_gap = effective_gap.min(width / (columns - 1));
+        }
+        if row_count > 1 {
+            effective_gap = effective_gap.min(height / (to_i64(row_count) - 1));
+        }
 
-        let row_count = self.children.len().div_ceil(columns);
-        let total_v_gap = self.gap.saturating_mul(row_count - 1);
-        let row_height = if row_count > 0 {
-            (to_i64(self.height) - to_i64(total_v_gap)) / to_i64(row_count)
-        } else {
-            0
-        };
+        let available_width = width - effective_gap * (columns - 1);
+        let available_height = height - effective_gap * (to_i64(row_count) - 1);
 
-        let cell_style = lipgloss::Style::new()
-            .width(to_i32_dim(col_width))
-            .height(to_i32_dim(row_height));
+        let widths = distribute(available_width, &equal_weights(column_count));
+        let heights: Vec<i64> = distribute(available_height, &equal_weights(row_count))
+            .into_iter()
+            .map(|row_height| row_height.max(1))
+            .collect();
 
+        let width_of = |column: usize| widths.get(column).copied().unwrap_or(0);
         let mut rows: Vec<String> = Vec::with_capacity(row_count);
 
-        let mut index = 0usize;
-        while index < self.children.len() {
-            let end = (index + columns).min(self.children.len());
+        for (row_index, chunk) in self.children.chunks(column_count).enumerate() {
+            let row_height = heights.get(row_index).copied().unwrap_or(1);
 
-            let mut cells: Vec<String> = self.children[index..end]
+            let mut cells: Vec<String> = chunk
                 .iter()
-                .map(|content| cell_style.render(content))
+                .enumerate()
+                .map(|(column, content)| render_cell(content, width_of(column), row_height))
                 .collect();
 
             // Fill the missing cells of the last row to keep the alignment.
-            while cells.len() < columns {
-                cells.push(cell_style.render(""));
+            for column in chunk.len()..column_count {
+                cells.push(render_cell("", width_of(column), row_height));
             }
 
-            let row = if self.gap > 0 {
-                join_with_spacer(&cells, &spacer_h(self.gap), lipgloss::TOP)
+            rows.push(if effective_gap > 0 {
+                join_with_spacer(&cells, &spacer_h(effective_gap as usize), lipgloss::TOP)
             } else {
                 lipgloss::join_horizontal(lipgloss::TOP, &as_refs(&cells))
-            };
-
-            rows.push(row);
-            index += columns;
+            });
         }
 
-        if self.gap > 0 {
-            join_vertical_with_spacer(&rows, &spacer_v(self.gap))
+        if effective_gap > 0 {
+            // The separator block already occupies one line, so `gap - 1`
+            // newlines leave exactly `gap` blank lines between two rows.
+            join_vertical_with_spacer(&rows, &spacer_v((effective_gap - 1) as usize))
         } else {
             lipgloss::join_vertical(lipgloss::LEFT, &as_refs(&rows))
+        }
+    }
+
+    /// Computes the layout like [`render`](Self::render), but reports the
+    /// configuration error instead of clamping it.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first error reported by [`validate`](Self::validate).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_layout::{Error, Grid};
+    ///
+    /// let grid = Grid::new(2).set_gap(-2).add_child("A");
+    /// assert_eq!(grid.try_render(), Err(Error::InvalidGap(-2)));
+    /// ```
+    pub fn try_render(&self) -> Result<String, Error> {
+        self.validate()?;
+        Ok(self.render())
+    }
+
+    /// Stores the first configuration error found while building the grid.
+    fn record(&mut self, error: Error) {
+        if self.error.is_none() {
+            self.error = Some(error);
         }
     }
 }
@@ -222,6 +404,13 @@ mod tests {
         assert_eq!(Grid::new(0).columns, 1);
         assert_eq!(Grid::new(1).columns, 1);
         assert_eq!(Grid::new(5).columns, 5);
+        assert_eq!(Grid::new(0).validate(), Err(Error::InvalidColumns(0)));
+    }
+
+    #[test]
+    fn try_new_rejects_invalid_columns() {
+        assert_eq!(Grid::try_new(-5).unwrap_err(), Error::InvalidColumns(-5));
+        assert!(Grid::try_new(3).is_ok());
     }
 
     #[test]
@@ -258,8 +447,8 @@ mod tests {
             .add_children(["a", "b", "c", "d"]);
         let out = strip_ansi(&grid.render());
         let lines: Vec<&str> = out.lines().collect();
-        // Each cell is 9 wide ((20 - 1) / 2) and the gap adds one column.
-        assert_eq!(lines[0].trim_end(), "a         b");
+        // 19 columns are left after the gap: the first cell takes the extra one.
+        assert_eq!(lines[0].trim_end(), "a          b");
         assert!(lines.len() >= 4);
     }
 

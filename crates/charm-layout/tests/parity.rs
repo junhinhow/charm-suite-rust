@@ -7,7 +7,7 @@
 use charm_layout::{Direction, Flex, Grid};
 use charm_parity::assert_golden;
 
-/// Small helper that mirrors the `out` builder of the Go parity program.
+/// Small helper that mirrors the `saida` builder of the Go parity program.
 struct Output(String);
 
 impl Output {
@@ -24,6 +24,7 @@ impl Output {
 }
 
 /// Builds the very same output as the Go parity program.
+#[allow(clippy::too_many_lines)]
 fn build_output() -> String {
     let mut out = Output(String::new());
 
@@ -98,6 +99,32 @@ fn build_output() -> String {
     out.section("flex vazio");
     out.block(&Flex::new(Direction::Row).render());
 
+    out.section("flex razao invalida tolerante");
+    out.block(
+        &Flex::new(Direction::Row)
+            .set_size(20, 2)
+            .add_child(-0.5, "A")
+            .add_child(1.0, "B")
+            .render(),
+    );
+
+    out.section("flex soma de razoes zero tolerante");
+    out.block(
+        &Flex::new(Direction::Row)
+            .set_size(20, 2)
+            .add_child(0.0, "A")
+            .add_child(0.0, "B")
+            .render(),
+    );
+
+    out.section("flex tamanho negativo tolerante");
+    out.block(
+        &Flex::new(Direction::Row)
+            .set_size(-10, 2)
+            .add_child(0.5, "A")
+            .render(),
+    );
+
     out.section("grid tres colunas cinco filhos com gap");
     out.block(
         &Grid::new(3)
@@ -133,6 +160,15 @@ fn build_output() -> String {
 
     out.section("grid vazio");
     out.block(&Grid::new(3).render());
+
+    out.section("grid gap maior que o espaco");
+    out.block(
+        &Grid::new(10)
+            .set_size(80, 10)
+            .set_gap(10)
+            .add_children(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"])
+            .render(),
+    );
 
     out.0
 }

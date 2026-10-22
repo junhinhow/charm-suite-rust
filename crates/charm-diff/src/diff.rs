@@ -1,10 +1,10 @@
-//! Core diff algorithm: LCS computation, hunk building and rendering.
+//! Core diff algorithms, hunk building and rendering.
 //!
 //! The implementation mirrors the Go original (`charm-diff`) line by line so
 //! that the produced output is byte-for-byte identical, including the order in
 //! which operations are emitted.
 
-use charm_core::{pad_or_truncate as core_pad_or_truncate, split_lines as core_split_lines};
+use charm_core::{display_width, strip_ansi};
 
 use crate::styles::DiffStyle;
 use crate::{Algorithm, Options};
@@ -68,7 +68,7 @@ struct ChangeRange {
 
 /// Converts a zero-based index into the line number used by the diff
 /// operations.
-fn line_number(index: usize) -> i64 {
+pub(crate) fn line_number(index: usize) -> i64 {
     i64::try_from(index).unwrap_or(i64::MAX)
 }
 
@@ -76,17 +76,71 @@ fn line_number(index: usize) -> i64 {
 ///
 /// Equivalent to `splitLines` of the Go original.
 pub(crate) fn split_lines(text: &str) -> Vec<&str> {
-    core_split_lines(text)
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let trailing_newline = text.ends_with('\n');
+    let mut lines = text.split('\n').collect::<Vec<_>>();
+    if lines.last() == Some(&"") {
+        lines.pop();
+    }
+    let line_count = lines.len();
+    for (index, line) in lines.iter_mut().enumerate() {
+        if index + 1 < line_count || trailing_newline {
+            *line = line.strip_suffix('\r').unwrap_or(line);
+        }
+    }
+    lines
 }
 
-/// Pads or truncates a string to a fixed **byte** width.
+/// Pads or truncates a string to a fixed display-cell width.
 ///
-/// Equivalent to `padOrTruncate` of the Go original, which decides whether to
-/// pad or truncate using `len(s)` (bytes) and may cut a multi-byte character
-/// in half. The Rust port performs the very same decision in bytes but always
-/// returns a valid UTF-8 string (invalid sequences become `U+FFFD`).
+/// Equivalent to the Go original's ANSI-aware width and truncation behavior.
 pub(crate) fn pad_or_truncate(text: &str, width: usize) -> String {
-    core_pad_or_truncate(text, width)
+    let expanded = expand_tabs(text);
+    // The Go ANSI helper ignores tab width while padding, then Lip Gloss
+    // expands the tab in the rendered text. Preserve that established behavior.
+    let visible_width = display_width(text);
+    if visible_width <= width {
+        let mut output = expanded;
+        output.extend(std::iter::repeat_n(' ', width - visible_width));
+        return output;
+    }
+    let plain = strip_ansi(&text.replace('\t', "\u{e000}")).replace('\u{e000}', "\t");
+    let suffix = if width > 3 { "..." } else { "" };
+    let content_width = width.saturating_sub(suffix.len());
+    let mut output = String::new();
+    let mut used = 0;
+    for character in plain.chars() {
+        if character == '\t' {
+            output.push_str("    ");
+            continue;
+        }
+        let character_width = display_width(&character.to_string());
+        if used + character_width > content_width {
+            break;
+        }
+        output.push(character);
+        used += character_width;
+    }
+    output.push_str(suffix);
+    output
+}
+
+fn expand_tabs(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut column = 0usize;
+    for character in text.chars() {
+        if character == '\t' {
+            let spaces = 4 - column % 4;
+            output.extend(std::iter::repeat_n(' ', spaces));
+            column += spaces;
+        } else {
+            output.push(character);
+            column += display_width(&character.to_string());
+        }
+    }
+    output
 }
 
 /// Computes the sequence of operations that transforms `old_lines` into
@@ -165,6 +219,7 @@ fn compute_selected_diff(
     match algorithm {
         Algorithm::Lcs => compute_diff(old_lines, new_lines),
         Algorithm::Myers => compute_diff_myers(old_lines, new_lines),
+        Algorithm::Xdiff => crate::xdiff::compute(old_lines, new_lines).ops,
     }
 }
 
@@ -603,6 +658,81 @@ pub(crate) fn build_hunks(ops: &[DiffOp], context_lines: usize) -> Vec<Hunk> {
     hunks
 }
 
+/// Builds hunks from xdiff's edit script and operation indexes, matching Git's
+/// exact context-window and merge rules (including insertion-led overlapping windows).
+fn build_xdiff_hunks(result: &crate::xdiff::Result, context_lines: usize) -> Vec<Hunk> {
+    if result.script.is_empty() {
+        return Vec::new();
+    }
+    let mut hunks = Vec::new();
+    let mut first = 0;
+    while first < result.script.len() {
+        let last = xdiff_hunk_end(&result.script, first, context_lines);
+        let first_change = result.script[first];
+        let last_change = result.script[last];
+        let old_start = first_change.i1.saturating_sub(context_lines);
+        let new_start = first_change.i2.saturating_sub(context_lines);
+        let old_remaining = result
+            .old_len
+            .saturating_sub(last_change.i1.saturating_add(last_change.chg1));
+        let new_remaining = result
+            .new_len
+            .saturating_sub(last_change.i2.saturating_add(last_change.chg2));
+        let trailing = context_lines.min(old_remaining).min(new_remaining);
+        let old_end = last_change.i1 + last_change.chg1 + trailing;
+        let new_end = last_change.i2 + last_change.chg2 + trailing;
+        let op_start = result.change_op_index[first].saturating_sub(first_change.i2 - new_start);
+        let op_end = result.change_op_index[last]
+            .saturating_add(last_change.chg1)
+            .saturating_add(last_change.chg2)
+            .saturating_add(trailing);
+        let ops = result
+            .ops
+            .get(op_start..op_end)
+            .unwrap_or_default()
+            .to_vec();
+        hunks.push(Hunk {
+            old_start: line_number(old_start),
+            old_count: line_number(old_end.saturating_sub(old_start)),
+            new_start: line_number(new_start),
+            new_count: line_number(new_end.saturating_sub(new_start)),
+            ops,
+        });
+        first = last + 1;
+    }
+    hunks
+}
+
+fn xdiff_hunk_end(script: &[crate::xdiff::Change], first: usize, context_lines: usize) -> usize {
+    let max_common = context_lines.saturating_mul(2);
+    let mut last_in_hunk = first;
+    for previous in first..script.len().saturating_sub(1) {
+        let current = previous + 1;
+        let distance = script[current]
+            .i1
+            .saturating_sub(script[previous].i1.saturating_add(script[previous].chg1));
+        if distance > max_common {
+            break;
+        }
+        if distance < context_lines
+            || (last_in_hunk != previous
+                && script[current].i1.saturating_sub(
+                    script[last_in_hunk]
+                        .i1
+                        .saturating_add(script[last_in_hunk].chg1),
+                ) > max_common)
+        {
+            if distance >= context_lines && last_in_hunk != previous {
+                return last_in_hunk;
+            }
+            last_in_hunk = current;
+        } else {
+            last_in_hunk = current;
+        }
+    }
+    last_in_hunk
+}
+
 /// Recomputes the counters and the start positions of a hunk from its
 /// operations.
 fn recalculate_hunk(hunk: &mut Hunk) {
@@ -696,26 +826,57 @@ pub(crate) fn build_side_by_side_pairs(ops: &[DiffOp]) -> Vec<SidePair> {
 ///
 /// Returns the styled `"<old> <new> "` prefix, where each number is padded to
 /// four columns and replaced by four spaces when it does not apply.
-fn format_line_numbers(op: &DiffOp, style: &DiffStyle) -> String {
+fn format_line_numbers(op: &DiffOp, style: &DiffStyle, width: usize) -> String {
     let old = if op.old_line >= 0 {
-        format!("{:>4}", op.old_line + 1)
+        format!("{:>width$}", op.old_line + 1)
     } else {
-        "    ".to_owned()
+        " ".repeat(width)
     };
     let new = if op.new_line >= 0 {
-        format!("{:>4}", op.new_line + 1)
+        format!("{:>width$}", op.new_line + 1)
     } else {
-        "    ".to_owned()
+        " ".repeat(width)
     };
     format!("{} ", style.line_number.render(&format!("{old} {new}")))
 }
 
+fn line_num_width_for(old_count: usize, new_count: usize) -> usize {
+    let mut total = old_count.max(new_count);
+    let mut digits = 1;
+    while total >= 10 {
+        total /= 10;
+        digits += 1;
+    }
+    digits.max(4)
+}
+
+fn line_num_prefix_width(num_width: usize) -> usize {
+    2 * num_width + 2
+}
+
+fn min_side_by_side_width(num_width: usize) -> usize {
+    2 * (num_width + 1) + 3 + 2
+}
+
+fn clamp_side_by_side_width(width: usize, num_width: usize) -> usize {
+    width.max(min_side_by_side_width(num_width))
+}
+
 /// Renders a unified diff.
 pub(crate) fn unified_diff(old: &str, new: &str, opts: &Options) -> String {
+    let opts = opts.normalize();
     let old_lines = split_lines(old);
     let new_lines = split_lines(new);
-    let ops = compute_selected_diff(&old_lines, &new_lines, opts.algorithm);
-    let hunks = build_hunks(&ops, opts.context_lines);
+    let xdiff_result =
+        (opts.algorithm == Algorithm::Xdiff).then(|| crate::xdiff::compute(&old_lines, &new_lines));
+    let ops = xdiff_result.as_ref().map_or_else(
+        || compute_selected_diff(&old_lines, &new_lines, opts.algorithm),
+        |r| r.ops.clone(),
+    );
+    let hunks = xdiff_result.as_ref().map_or_else(
+        || build_hunks(&ops, opts.context_lines),
+        |result| build_xdiff_hunks(result, opts.context_lines),
+    );
 
     if hunks.is_empty() {
         return String::new();
@@ -723,21 +884,20 @@ pub(crate) fn unified_diff(old: &str, new: &str, opts: &Options) -> String {
 
     let mut buf = String::new();
     let style = &opts.style;
+    let number_width = line_num_width_for(old_lines.len(), new_lines.len());
 
     for hunk in &hunks {
         // Hunk header.
         let header = format!(
-            "@@ -{},{} +{},{} @@",
-            hunk.old_start + 1,
-            hunk.old_count,
-            hunk.new_start + 1,
-            hunk.new_count
+            "@@ -{} +{} @@",
+            format_hunk_range(hunk.old_start, hunk.old_count),
+            format_hunk_range(hunk.new_start, hunk.new_count),
         );
         buf.push_str(&style.hunk_header.render(&header));
         buf.push('\n');
 
         for op in &hunk.ops {
-            let line_num = format_line_numbers(op, style);
+            let line_num = format_line_numbers(op, style, number_width);
             match op.kind {
                 OpKind::Equal => {
                     buf.push_str(&line_num);
@@ -761,8 +921,17 @@ pub(crate) fn unified_diff(old: &str, new: &str, opts: &Options) -> String {
     buf
 }
 
+fn format_hunk_range(start: i64, count: i64) -> String {
+    match count {
+        0 => format!("{start},0"),
+        1 => format!("{}", start + 1),
+        _ => format!("{},{}", start + 1, count),
+    }
+}
+
 /// Renders a side-by-side diff of the given total width.
 pub(crate) fn side_by_side_diff(old: &str, new: &str, width: usize, opts: &Options) -> String {
+    let opts = opts.normalize();
     let old_lines = split_lines(old);
     let new_lines = split_lines(new);
     let ops = compute_selected_diff(&old_lines, &new_lines, opts.algorithm);
@@ -775,14 +944,11 @@ pub(crate) fn side_by_side_diff(old: &str, new: &str, width: usize, opts: &Optio
 
     // Width of each column: half of the space left after the separator and
     // the line numbers.
-    let line_num_width: i64 = 4;
-    let sep_width: i64 = 3;
-    let total_width = i64::try_from(width).unwrap_or(i64::MAX);
-    let mut col_width = (total_width - sep_width - 2 * line_num_width) / 2;
-    if col_width < 10 {
-        col_width = 10;
-    }
-    let col_width = col_width as usize;
+    let line_num_width = line_num_width_for(old_lines.len(), new_lines.len());
+    let width = clamp_side_by_side_width(width, line_num_width);
+    let overhead = line_num_prefix_width(line_num_width) + 3;
+    let col_width = width.saturating_sub(overhead) / 2;
+    let col_width = col_width.max(1);
 
     let separator = style.separator.render(" | ");
 
@@ -791,21 +957,17 @@ pub(crate) fn side_by_side_diff(old: &str, new: &str, width: usize, opts: &Optio
 
     let mut buf = String::new();
     for pair in &pairs {
-        let mut left_num = "    ".to_owned();
+        let mut left_num = " ".repeat(line_num_width);
         let mut left_text = String::new();
-        let mut right_num = "    ".to_owned();
+        let mut right_num = " ".repeat(line_num_width);
         let mut right_text = String::new();
 
         if let Some(left) = &pair.left {
-            left_num = style
-                .line_number
-                .render(&format!("{:>4}", left.old_line + 1));
+            left_num = format!("{:>line_num_width$}", left.old_line + 1);
             left_text.clone_from(&left.text);
         }
         if let Some(right) = &pair.right {
-            right_num = style
-                .line_number
-                .render(&format!("{:>4}", right.new_line + 1));
+            right_num = format!("{:>line_num_width$}", right.new_line + 1);
             right_text.clone_from(&right.text);
         }
 
@@ -838,11 +1000,11 @@ pub(crate) fn side_by_side_diff(old: &str, new: &str, width: usize, opts: &Optio
             ),
         };
 
-        buf.push_str(&left_num);
+        buf.push_str(&style.line_number.render(&left_num));
         buf.push(' ');
         buf.push_str(&left_text);
         buf.push_str(&separator);
-        buf.push_str(&right_num);
+        buf.push_str(&style.line_number.render(&right_num));
         buf.push(' ');
         buf.push_str(&right_text);
         buf.push('\n');
@@ -1006,9 +1168,54 @@ mod tests {
             new_line: 4,
             text: "x".to_owned(),
         };
-        let rendered = format_line_numbers(&op, &style);
+        let rendered = format_line_numbers(&op, &style, 4);
         let plain = charm_core::strip_ansi(&rendered);
         assert_eq!(plain, "        5 ");
+    }
+
+    #[test]
+    fn zero_value_style_is_normalized_to_the_default() {
+        let empty_style = DiffStyle {
+            addition: lipgloss::Style::new(),
+            deletion: lipgloss::Style::new(),
+            context: lipgloss::Style::new(),
+            hunk_header: lipgloss::Style::new(),
+            line_number: lipgloss::Style::new(),
+            separator: lipgloss::Style::new(),
+        };
+        let options = Options {
+            style: empty_style,
+            ..Options::default()
+        };
+        assert_eq!(
+            crate::unified_diff_with_options("old\n", "new\n", &options),
+            crate::unified_diff("old\n", "new\n")
+        );
+    }
+
+    #[test]
+    fn dynamic_line_number_width_and_side_by_side_clamp() {
+        assert_eq!(line_num_width_for(0, 0), 4);
+        assert_eq!(line_num_width_for(9_999, 5), 4);
+        assert_eq!(line_num_width_for(10_000, 5), 5);
+        assert_eq!(line_num_width_for(1, 123_456), 6);
+        assert_eq!(line_num_prefix_width(5), 12);
+        assert_eq!(min_side_by_side_width(4), 15);
+        assert_eq!(clamp_side_by_side_width(2, 4), 15);
+        assert_eq!(clamp_side_by_side_width(80, 4), 80);
+    }
+
+    #[test]
+    fn side_by_side_uses_display_width_and_respects_narrow_width() {
+        let output = crate::side_by_side_diff("日本語のテキスト\n", "áéíóú 🎉\n", 20);
+        for line in output.lines() {
+            assert!(display_width(line) <= 20, "line too wide: {line:?}");
+        }
+        assert_eq!(pad_or_truncate("\tprintln!", 1), "    p");
+        assert_eq!(
+            charm_core::strip_ansi(&DiffStyle::terminal().deletion.render("    p")),
+            "    p"
+        );
     }
 
     #[test]

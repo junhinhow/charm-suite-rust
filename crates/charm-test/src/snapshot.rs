@@ -2,9 +2,9 @@
 
 use charmed_bubbletea::Model;
 
-use crate::{view_string, Simulator};
+use crate::{Simulator, ViewSnapshot};
 
-/// Compare the current ANSI-stripped view with an Insta snapshot.
+/// Compare the ANSI-stripped view snapshot with an Insta snapshot.
 ///
 /// Set `INSTA_UPDATE=always` to update snapshots using Insta's standard workflow.
 ///
@@ -24,11 +24,17 @@ use crate::{view_string, Simulator};
 /// // In a test, call require_snapshot(&sim, Some("static_view"));
 /// ```
 pub fn require_snapshot<M: Model>(simulator: &Simulator<M>, name: Option<&str>) {
-    let view = view_string(simulator);
+    if let Some(error) = simulator.error() {
+        panic!("simulation failed: {error}");
+    }
+    let mut snapshot = simulator.view_snapshot();
+    snapshot.content =
+        charm_core::strip_ansi(&snapshot.content.replace("\r\n", "\n").replace('\r', "\n"));
+    let rendered = ViewSnapshot::to_string(&snapshot);
     let mut settings = insta::Settings::clone_current();
     settings.set_snapshot_path("../tests/snapshots");
     settings.bind(|| match name {
-        Some(name) => insta::assert_snapshot!(name, view),
-        None => insta::assert_snapshot!(view),
+        Some(name) => insta::assert_snapshot!(name, rendered),
+        None => insta::assert_snapshot!(rendered),
     });
 }

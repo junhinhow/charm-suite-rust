@@ -66,30 +66,19 @@ pub(crate) fn spacer_v(height: usize) -> String {
     lipgloss::security::safe_str_repeat("\n", height)
 }
 
-/// Converts an `usize` dimension into the `i32` expected by `lipgloss`.
+/// Converts a count into an `i64` used by the layout arithmetic.
 ///
-/// Values above `i32::MAX` are clamped instead of overflowing.
-pub(crate) fn to_i32(value: usize) -> i32 {
-    i32::try_from(value).unwrap_or(i32::MAX)
-}
-
-/// Converts an `usize` dimension into the `i64` used by the layout maths.
-///
-/// Values above `i64::MAX` are clamped instead of wrapping around.
+/// Values above `i64::MAX` are clamped to `i64::MAX`.
 pub(crate) fn to_i64(value: usize) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
-/// Converts a computed dimension into the `i32` expected by `lipgloss`.
+/// Converts a dimension into the `i32` expected by `lipgloss`.
 ///
-/// Negative dimensions — which happen when the gap is bigger than the
-/// available space — are clamped to zero, the same way `lipgloss` clamps
-/// them. Values above `i32::MAX` are clamped as well.
-pub(crate) fn to_i32_dim(value: i64) -> i32 {
-    if value <= 0 {
-        return 0;
-    }
-    i32::try_from(value).unwrap_or(i32::MAX)
+/// Negative values are clamped to zero and values above `i32::MAX` are clamped
+/// to `i32::MAX`.
+pub(crate) fn to_i32(value: i64) -> i32 {
+    i32::try_from(value.max(0)).unwrap_or(i32::MAX)
 }
 
 #[cfg(test)]
@@ -124,24 +113,10 @@ mod tests {
     }
 
     #[test]
-    fn to_i32_clamps_instead_of_overflowing() {
+    fn to_i32_clamps_to_the_valid_range() {
+        assert_eq!(to_i32(-10), 0);
         assert_eq!(to_i32(0), 0);
         assert_eq!(to_i32(42), 42);
-        assert_eq!(to_i32(usize::MAX), i32::MAX);
-    }
-
-    #[test]
-    fn to_i64_clamps_instead_of_wrapping_around() {
-        assert_eq!(to_i64(0), 0);
-        assert_eq!(to_i64(42), 42);
-        assert_eq!(to_i64(usize::MAX), i64::MAX);
-    }
-
-    #[test]
-    fn to_i32_dim_clamps_negative_values_to_zero() {
-        assert_eq!(to_i32_dim(-10), 0);
-        assert_eq!(to_i32_dim(0), 0);
-        assert_eq!(to_i32_dim(7), 7);
-        assert_eq!(to_i32_dim(i64::MAX), i32::MAX);
+        assert_eq!(to_i32(i64::MAX), i32::MAX);
     }
 }

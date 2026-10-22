@@ -12,9 +12,9 @@ use crate::{MessageRecord, Simulator};
 /// # Panics
 /// Panics with expected and actual views when they differ.
 pub fn require_view<M: Model>(simulator: &Simulator<M>, expected: &str) {
-    let actual = strip_ansi(&simulator.view());
-    let expected = expected.trim();
-    let actual = actual.trim();
+    require_no_error(simulator);
+    let actual = normalize_view(&simulator.view());
+    let expected = normalize_view(expected);
     assert!(
         actual == expected,
         "view mismatch:\n--- expected ---\n{expected}\n--- actual ---\n{actual}"
@@ -26,6 +26,7 @@ pub fn require_view<M: Model>(simulator: &Simulator<M>, expected: &str) {
 /// # Panics
 /// Panics with the current view when the substring is absent.
 pub fn require_view_contains<M: Model>(simulator: &Simulator<M>, substr: &str) {
+    require_no_error(simulator);
     let actual = strip_ansi(&simulator.view());
     assert!(
         actual.contains(substr),
@@ -38,6 +39,7 @@ pub fn require_view_contains<M: Model>(simulator: &Simulator<M>, substr: &str) {
 /// # Panics
 /// Panics with the current view when the substring is present.
 pub fn require_view_not_contains<M: Model>(simulator: &Simulator<M>, substr: &str) {
+    require_no_error(simulator);
     let actual = strip_ansi(&simulator.view());
     assert!(
         !actual.contains(substr),
@@ -50,6 +52,7 @@ pub fn require_view_not_contains<M: Model>(simulator: &Simulator<M>, substr: &st
 /// # Panics
 /// Panics when the number of non-empty lines differs from `expected`.
 pub fn require_view_lines<M: Model>(simulator: &Simulator<M>, expected: usize) {
+    require_no_error(simulator);
     let actual = strip_ansi(&simulator.view());
     let lines = actual
         .lines()
@@ -69,6 +72,16 @@ pub fn view_string<M: Model>(simulator: &Simulator<M>) -> String {
 /// Return an ANSI-stripped view with a short diagnostic heading.
 pub fn dump_view<M: Model>(simulator: &Simulator<M>) -> String {
     format!("Current view:\n{}", view_string(simulator))
+}
+
+fn normalize_view(view: &str) -> String {
+    strip_ansi(&view.replace("\r\n", "\n")).trim().to_owned()
+}
+
+fn require_no_error<M: Model>(simulator: &Simulator<M>) {
+    if let Some(error) = simulator.error() {
+        panic!("simulation failed: {error}");
+    }
 }
 
 /// Format simulator message records for test diagnostics.
@@ -114,7 +127,7 @@ mod tests {
         require_view_lines(&sim, 2);
         assert_eq!(view_string(&sim), "red\n\nsecond");
         assert!(dump_view(&sim).contains("Current view:"));
-        sim.send_key("!");
+        sim.send_key("!").expect("valid single-character key");
         assert!(dump_messages(&sim).contains("KeyMsg"));
     }
 
@@ -140,5 +153,20 @@ mod tests {
     #[should_panic(expected = "non-empty lines")]
     fn line_assertion_reports_mismatches() {
         require_view_lines(&Simulator::new(TextModel(String::new())), 2);
+    }
+
+    #[test]
+    fn exact_assertion_normalizes_windows_line_endings() {
+        require_view(
+            &Simulator::new(TextModel(String::new())),
+            "\n\r\nsecond\r\n",
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "simulation failed")]
+    fn assertions_fail_when_simulator_has_an_error() {
+        let simulator = Simulator::with_size(TextModel(String::new()), 0, 24);
+        require_view(&simulator, "");
     }
 }

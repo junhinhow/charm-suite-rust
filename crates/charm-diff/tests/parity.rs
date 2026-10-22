@@ -30,7 +30,7 @@ struct TestCase {
 }
 
 /// Total widths used for the side-by-side rendering.
-const WIDTHS: [usize; 3] = [40, 80, 120];
+const WIDTHS: [usize; 4] = [15, 40, 80, 120];
 
 /// The samples rendered by both implementations.
 const CASES: &[TestCase] = &[
@@ -168,6 +168,13 @@ const CASES: &[TestCase] = &[
         github_style: false,
     },
     TestCase {
+        name: "overlapping_hunks",
+        old: "o00\no01\no02\no03\n",
+        new: "n00\nn01\no02\nn03\n",
+        context_lines: 3,
+        github_style: false,
+    },
+    TestCase {
         name: "github_style",
         old: "alpha\nbravo\ncharlie\ndelta\n",
         new: "alpha\nbravo modified\ncharlie\ndelta\n",
@@ -202,6 +209,24 @@ fn render_report() -> String {
         }
         let _ = writeln!(out, "### END CASE {}", case.name);
     }
+    let old_lines = (0..9_999)
+        .map(|_| "line")
+        .chain(std::iter::once("old"))
+        .collect::<Vec<_>>();
+    let new_lines = (0..9_999)
+        .map(|_| "line")
+        .chain(std::iter::once("new"))
+        .collect::<Vec<_>>();
+    let old = format!("{}\n", old_lines.join("\n"));
+    let new = format!("{}\n", new_lines.join("\n"));
+    let opts = Options {
+        context_lines: 0,
+        ..Options::default()
+    };
+    let _ = writeln!(out, "### CASE line_number_width_5_digits");
+    let _ = writeln!(out, "--- unified context=0 ---");
+    out.push_str(&unified_diff_with_options(&old, &new, &opts));
+    let _ = writeln!(out, "### END CASE line_number_width_5_digits");
     out
 }
 

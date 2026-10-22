@@ -9,9 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Algorithm::{Lcs, Myers}` selection in `Options`; LCS remains the default for
-  Go output parity, while Myers computes a shortest edit script with linear
-  auxiliary memory.
+- Git-compatible `Algorithm::Xdiff` as the default, including xdiff's linear-
+  space Myers engine, record cleanup, and change compaction. Existing `Lcs` and
+  `Myers` selections remain available for Rust callers.
+- Script-based hunk construction, dynamic line-number widths, side-by-side
+  width clamping, CRLF normalization, and display-cell-aware truncation.
+- Hunk/regression tests plus 200 deterministic randomized comparisons against
+  `git diff`; regenerated the Go parity golden with 10,000-line width coverage.
+
+### Changed
+
+- Default operation alignment changes from the previous LCS implementation to
+  Git-compatible xdiff. `Options` keeps the Rust-only `algorithm` field; Go's
+  updated `Options` still exposes only `ContextLines` and `Style`.
 
 ## [0.1.0] - 2026-10-22
 
@@ -32,8 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known differences
 
-- Column truncation counts bytes (like the Go original) instead of characters;
-  broken UTF-8 sequences are replaced by `U+FFFD` in both implementations.
+- Rust `context_lines` is `usize`; negative Go values cannot be expressed, so
+  callers use `0` for the equivalent no-context behavior.
 - ANSI escape sequences are always emitted, while the Go implementation only
   emits colours when stdout is a TTY.
 

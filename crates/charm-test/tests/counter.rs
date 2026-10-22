@@ -54,23 +54,23 @@ impl Model for Counter {
 fn counter_increment_and_decrement_match_go_example() {
     let mut simulator = Simulator::new(Counter::new());
     require_view_contains(&simulator, "Count: 0");
-    simulator.send_keys(&["k", "k", "k"]);
+    simulator.send_keys(&["k", "k", "k"]).expect("valid keys");
     require_view_contains(&simulator, "Count: 3");
-    simulator.send_keys(&["j", "j"]);
+    simulator.send_keys(&["j", "j"]).expect("valid keys");
     require_view_contains(&simulator, "Count: 1");
 }
 
 #[test]
 fn counter_never_goes_below_zero() {
     let mut simulator = Simulator::new(Counter::new());
-    simulator.send_keys(&["j", "j", "j"]);
+    simulator.send_keys(&["j", "j", "j"]).expect("valid keys");
     require_view_contains(&simulator, "Count: 0");
 }
 
 #[test]
 fn counter_quit_clears_the_view() {
     let mut simulator = Simulator::new(Counter::new());
-    simulator.send_key("q");
+    simulator.send_key("q").expect("valid key");
     require_view_not_contains(&simulator, "Count:");
 }
 

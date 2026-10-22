@@ -30,12 +30,14 @@ impl Model for Counter {
 }
 
 let mut sim = Simulator::new(Counter(0));
-sim.send_key("+");
+sim.send_key("+").expect("tecla válida");
 require_view_contains(&sim, "Count: 1");
 ```
 
 `require_view`, `require_view_contains`, `require_view_not_contains` e `require_view_lines` comparam a saída sem ANSI. `require_snapshot` usa Insta; atualize snapshots com `INSTA_UPDATE=always`.
 
+Use `tick`/`every` para testar temporizadores deterministicamente e avance o relógio com `Simulator::advance`. `SimulatorOptions` configura o tamanho do terminal e os limites de processamento/histórico. `view_snapshot()` serializa o conteúdo renderizado com um cabeçalho estável.
+
 ## Diferenças conhecidas
 
-`Message` do Bubble Tea é consumida por `Model::update` e não implementa `Clone`. Por isso, `Simulator::messages()` retorna registros de diagnóstico (`MessageRecord`), e não os valores consumidos do tipo `Message` da API Go. O runtime também apaga o tipo concreto do payload; os registros identificam alguns tipos embutidos e usam a representação `Debug` do wrapper para valores. Para nomes de tecla desconhecidos com várias letras, Rust preserva os runes, pois `KeyMsg` não tem campo equivalente ao `Text` do Go.
+`Message` do Bubble Tea é consumida por `Model::update` e não implementa `Clone`. Por isso, `Simulator::messages()` retorna registros de diagnóstico (`MessageRecord`), e não os valores consumidos do tipo `Message` da API Go. O runtime apaga o tipo concreto do payload e `Model::view()` retorna apenas uma `String`; portanto, `ViewSnapshot` não captura metadados do terminal (cursor, cores, tela alternativa etc.). O runtime também não possui mensagens de inicialização de perfil de cor e ambiente, então o simulador envia apenas `WindowSizeMsg`. Use `tick`/`every` nos testes com relógio virtual; o tipo apagado de comandos do runtime não permite ao simulador reconhecer/interceptar os temporizadores bloqueantes do runtime. Nomes de teclas desconhecidos com várias letras são rejeitados. Só são aceitas combinações de modificadores com `KeyType` correspondente no runtime (além de Alt); combinações arbitrárias, como Ctrl+Shift+letra e cmd/super/meta, retornam `KeyParseError`.

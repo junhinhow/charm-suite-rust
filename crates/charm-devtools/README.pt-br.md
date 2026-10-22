@@ -38,11 +38,11 @@ let wrapped = middleware(App);
 assert_eq!(wrapped.view(), "app");
 ```
 
-O histórico conserva as 100 mensagens mais recentes. Todas as mensagens, inclusive as teclas de navegação do inspetor, são encaminhadas ao model interno. `DevState::current_state()` guarda a última view do model.
+O histórico conserva as 100 mensagens mais recentes. F12 e, com o painel aberto, Up/Down/Tab são consumidas pelo inspetor; as demais mensagens são encaminhadas ao model interno. Snapshots de estado/árvore são recalculados a cada 25 mensagens encaminhadas e sob demanda enquanto o painel está visível. `DevState::current_state()` guarda a última view do model. O inspetor limita profundidade da árvore, permite rolar mensagens antigas e formata as linhas pela largura de exibição Unicode.
 
 ## Breaking change em relação ao Go
 
-O Go usa reflexão para descobrir models aninhados automaticamente. Rust não oferece reflexão equivalente em runtime; portanto, models devem implementar `DevInspect` para descrever a árvore de componentes. A implementação padrão informa somente o tipo raiz. Essa é uma alteração incompatível deliberada. Além disso, `Message` do Bubble Tea apaga o tipo concreto e não expõe o valor do payload; os registros usam o tipo apagado e sua representação pública `Debug`.
+O Go usa reflexão para descobrir models aninhados automaticamente. Rust não oferece reflexão equivalente em runtime; portanto, models devem implementar `DevInspect` para descrever a árvore de componentes. A implementação padrão informa somente o tipo raiz. O trait também permite um nome customizado; o chamador marca limites de ciclo com `ComponentNode::with_cycle` (ciclos não são detectados automaticamente). Essa é uma alteração incompatível deliberada; `middleware` também exige um `Model + DevInspect` concreto, em vez de aceitar model nulo. A aba State mostra a última view renderizada, não o dump `%+v` do model Go. Além disso, `Message` do Bubble Tea apaga o tipo concreto e não expõe o valor do payload; os registros usam o tipo apagado e sua representação pública `Debug`. Como `DevModel::view()` atualiza o snapshot sob demanda com sincronização interior, `DevModel::state()` devolve um `MutexGuard`.
 
 ## Macro derive
 

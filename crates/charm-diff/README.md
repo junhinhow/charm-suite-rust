@@ -4,13 +4,15 @@ Beautiful terminal diff viewer for the [Charm](https://charm.sh) ecosystem. Prod
 
 > **[Read in Portuguese](README.pt-br.md)**
 
-This is a Rust port of the Go library [`github.com/junhinhow/charm-diff`](https://github.com/junhinhow/charm-diff). The default LCS output is byte-for-byte identical to the original (ANSI codes aside), which is verified by golden files generated from the Go implementation.
+This is a Rust port of the Go library [`github.com/junhinhow/charm-diff`](https://github.com/junhinhow/charm-diff). The default engine reproduces Git's `xdiff` behavior, including edit alignment and hunk construction; parity is checked against Go-generated golden files and randomized `git diff` comparisons.
 
 ## Features
 
 - **Unified diff** — classic format with `+`/`-` markers and line numbers
+- **Git-compatible hunks** — hunk ranges, context, and edit ordering follow `git diff -U<N>`
 - **Side-by-side diff** — two-column comparison at any terminal width
 - **Configurable context lines** — show as many surrounding lines as you want (default: 3)
+- **Linear auxiliary memory** — the default xdiff engine handles large inputs without an LCS table
 - **Predefined styles** — GitHub-inspired and minimal terminal themes
 - **Custom styles** — build your own `DiffStyle` with any Lip Gloss style
 
@@ -60,7 +62,7 @@ fn main() {
     let opts = Options {
         context_lines: 5,
         style: DiffStyle::github(),
-        algorithm: Algorithm::Myers,
+        algorithm: Algorithm::Xdiff,
     };
 
     print!("{}", unified_diff_with_options("a\nb\n", "a\nc\n", &opts));
@@ -89,7 +91,7 @@ cargo run -p charm-diff --example demo
 | Type | Description |
 |------|-------------|
 | `Options` | Configuration: `context_lines: usize`, `style: DiffStyle`, `algorithm: Algorithm` |
-| `Algorithm` | `Lcs` (default, Go parity) or `Myers` (linear auxiliary memory) |
+| `Algorithm` | `Xdiff` (default, Git/Go parity), `Lcs`, or `Myers` |
 | `DiffStyle` | Lip Gloss styles for each diff element |
 
 ### Style Constructors
@@ -112,39 +114,36 @@ cargo run -p charm-diff --example demo
 | `DefaultStyle()` | `DiffStyle::default()` |
 | `TerminalStyle()` | `DiffStyle::terminal()` |
 | `GitHubStyle()` | `DiffStyle::github()` |
-| `Options{ContextLines: n, Style: s}` | `Options { context_lines: n, style: s, algorithm: Algorithm::Lcs }` |
+| `Options{ContextLines: n, Style: s}` | `Options { context_lines: n, style: s, algorithm: Algorithm::Xdiff }` |
 
 ## Algorithms
 
-`Options` selects the diff algorithm with its `algorithm` field:
+`Options` retains a Rust-specific `algorithm` selector; the Go API has no such field. The default is `Algorithm::Xdiff`, which is the engine used by the updated Go library:
 
-- **`Algorithm::Lcs` (default):** uses the classic dynamic-programming LCS
-  table, with `O(n · m)` memory. Its tie-breaking matches the original Go
-  implementation exactly, preserving byte-for-byte parity.
-- **`Algorithm::Myers`:** uses Myers' bidirectional middle-snake divide-and-
-  conquer algorithm with `O(n + m)` auxiliary memory. It produces a shortest
-  edit script and is recommended for large files.
+- **`Algorithm::Xdiff` (default):** uses Git's linear-space Myers engine,
+  including record cleanup and change compaction. Its unified hunk layout
+  matches `git diff -U<N>` and the Go implementation.
+- **`Algorithm::Lcs`:** uses the classic dynamic-programming LCS table, with
+  `O(n · m)` memory. Kept for compatibility with previous Rust releases.
+- **`Algorithm::Myers`:** uses a linear-space middle-snake algorithm and
+  computes a shortest edit script, but does not apply xdiff's cleanup and
+  compaction rules.
 
-Both algorithms emit operations from the start of the input to the end. When
-multiple shortest diffs are possible (for example, with repeated lines), Myers
-may choose a different valid ordering of insertions and deletions than LCS;
-therefore its rendered output can differ from the Go golden while still
-transforming the old text into the new text with the minimum number of edits.
+`Lcs` and `Myers` may choose different valid insertion/deletion alignments than
+Git when repeated lines make multiple scripts possible; use the default
+`Xdiff` when Go/Git parity matters.
 
 Operations are then grouped into *hunks* using `context_lines`; the side-by-side
 layout pairs a deletion followed by an insertion into a single "modified line".
 
 ## Known differences
 
-- **Truncation counts bytes, not characters.** The column padding/truncation
-  used by the side-by-side layout decides whether to pad or truncate using the
-  **byte** length of the line (`len(s)` in Go), and cuts the string at a byte
-  offset. This is the behaviour of the Go original and it is preserved here.
-  The Go implementation may therefore cut a multi-byte character in half and
-  emit an invalid UTF-8 sequence; both implementations replace the broken
-  bytes with `U+FFFD` when the styled output is produced, so the rendered
-  result is identical. In Rust the cut is performed with
-  `String::from_utf8_lossy`, which never yields an invalid `String`.
+- **`context_lines` is unsigned.** Rust uses `usize`, so negative values cannot
+  be represented; pass `0` for the Go behavior of normalizing negative context
+  to no context.
+- **The algorithm selector is Rust-only.** Go always uses xdiff. The Rust
+  `Lcs` and `Myers` alternatives are retained for compatibility and may render
+  a different valid alignment on ambiguous repeated lines.
 - **ANSI codes are always emitted.** The Go implementation only emits colours
   when stdout is a TTY, while the Rust port always renders the ANSI escape
   sequences. The parity harness strips the ANSI codes from both sides before
@@ -156,12 +155,14 @@ layout pairs a deletion followed by an insertion into a single "modified line".
 ## Parity with the Go implementation
 
 The golden file [`tests/golden/diff.txt`](tests/golden/diff.txt) is generated
-by the Go program `reference/go/charm-diff/cmd/parity` and contains 20 samples
+by the Go program `reference/go/charm-diff/cmd/parity` and contains 20 regular samples
 (identical files, insertions, deletions, modifications, adjacent and distant
 changes, empty files, missing trailing newline, unicode, blank lines, the
 context values `0`, `1`, `3` and `10`, tabs, long lines, repeated lines, a full
 rewrite and the GitHub style), each rendered as a unified diff and as a
-side-by-side diff at the widths 40, 80 and 120.
+side-by-side diff at widths 15, 40, 80 and 120. A 10,000-line case also checks
+dynamic five-digit line-number formatting. The Rust tests additionally compare
+200 deterministic randomized unified diffs with Git.
 
 Regenerate it with:
 

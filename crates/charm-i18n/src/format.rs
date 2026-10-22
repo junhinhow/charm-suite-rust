@@ -404,6 +404,290 @@ fn type_name(value: &Value) -> &'static str {
     }
 }
 
+/// Verbs accepted in translated templates, as in Go's `fmt`.
+const TEMPLATE_VERBS: &str = "vTtbcdoOqxXUeEfFgGsp";
+
+/// Formats a translated `template` the way the Go original does.
+///
+/// Unlike [`sprintf`], fmt diagnostics are never returned: when the template
+/// cannot be formatted with `args` (missing arguments, a mismatched type or an
+/// unsupported verb), `None` is returned and the caller keeps the template.
+/// Extra arguments are ignored and `%%` is the only literal percent sign that
+/// needs escaping. A `%` that does not start a valid directive is kept as is.
+pub(crate) fn format_template(template: &str, args: &[Value]) -> Option<String> {
+    let chars: Vec<char> = template.chars().collect();
+    let mut out = String::with_capacity(template.len());
+    let mut next = 0;
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] != '%' {
+            out.push(chars[i]);
+            i += 1;
+            continue;
+        }
+        if chars.get(i + 1) == Some(&'%') {
+            out.push('%');
+            i += 2;
+            continue;
+        }
+        let Some(directive) = TemplateDirective::parse(&chars[i..]) else {
+            out.push('%');
+            i += 1;
+            continue;
+        };
+        let (indices, after) = directive.consumed(next, args.len())?;
+        next = after;
+        let values: Vec<&Value> = indices.iter().map(|&index| &args[index]).collect();
+        out.push_str(&directive.render(&values)?);
+        i += directive.size;
+    }
+    Some(out)
+}
+
+/// A directive of a translated template, such as `%-8.2f` or `%[2]s`.
+#[derive(Debug)]
+struct TemplateDirective {
+    flags: String,
+    explicit: Option<usize>,
+    star_width: bool,
+    width: String,
+    star_precision: bool,
+    precision: Option<String>,
+    verb: char,
+    size: usize,
+}
+
+impl TemplateDirective {
+    /// Parses a directive at the start of `chars`, which must begin with `%`.
+    fn parse(chars: &[char]) -> Option<Self> {
+        let mut i = 1;
+        let mut flags = String::new();
+        while let Some(&c) = chars.get(i) {
+            if !matches!(c, '+' | '-' | '#' | '0') {
+                break;
+            }
+            flags.push(c);
+            i += 1;
+        }
+
+        let mut explicit = None;
+        if chars.get(i) == Some(&'[') {
+            let start = i + 1;
+            let (digits, end) = take_digits(chars, start);
+            if digits.is_empty() || chars.get(end) != Some(&']') {
+                return None;
+            }
+            let index: usize = digits.parse().ok()?;
+            if index == 0 {
+                return None;
+            }
+            explicit = Some(index - 1);
+            i = end + 1;
+        }
+
+        let mut star_width = false;
+        let mut width = String::new();
+        if chars.get(i) == Some(&'*') {
+            star_width = true;
+            i += 1;
+        } else {
+            let (digits, end) = take_digits(chars, i);
+            width = digits;
+            i = end;
+        }
+
+        let mut star_precision = false;
+        let mut precision = None;
+        if chars.get(i) == Some(&'.') {
+            let (digits, end) = take_digits(chars, i + 1);
+            i = end;
+            if chars.get(i) == Some(&'*') {
+                star_precision = true;
+                i += 1;
+            } else {
+                precision = Some(format!(".{digits}"));
+            }
+        }
+
+        let verb = *chars.get(i)?;
+        if !TEMPLATE_VERBS.contains(verb) {
+            return None;
+        }
+        i += 1;
+
+        if explicit.is_some() && (star_width || star_precision) {
+            return None;
+        }
+
+        Some(Self {
+            flags,
+            explicit,
+            star_width,
+            width,
+            star_precision,
+            precision,
+            verb,
+            size: i,
+        })
+    }
+
+    /// Returns the argument indices used by the directive and the next
+    /// implicit argument index, or `None` when an argument is missing.
+    fn consumed(&self, next: usize, total: usize) -> Option<(Vec<usize>, usize)> {
+        if let Some(index) = self.explicit {
+            return (index < total).then(|| (vec![index], index + 1));
+        }
+        let mut indices = Vec::with_capacity(3);
+        let mut cursor = next;
+        if self.star_width {
+            indices.push(cursor);
+            cursor += 1;
+        }
+        if self.star_precision {
+            indices.push(cursor);
+            cursor += 1;
+        }
+        indices.push(cursor);
+        cursor += 1;
+        indices
+            .iter()
+            .all(|&index| index < total)
+            .then_some((indices, cursor))
+    }
+
+    /// Formats the last of `values`, taking `*` width and precision from the
+    /// preceding ones. Returns `None` when fmt reports a diagnostic.
+    fn render(&self, values: &[&Value]) -> Option<String> {
+        let mut values = values.iter().copied();
+        let mut flags = self.flags.clone();
+
+        let width = if self.star_width {
+            let value = as_int(values.next()?)?;
+            if value < 0 {
+                flags.push('-');
+                flags.retain(|c| c != '0');
+            }
+            value.unsigned_abs().to_string()
+        } else {
+            self.width.clone()
+        };
+
+        let precision = if self.star_precision {
+            let value = as_int(values.next()?)?;
+            if value < 0 {
+                String::new()
+            } else {
+                format!(".{value}")
+            }
+        } else {
+            self.precision.clone().unwrap_or_default()
+        };
+
+        let value = values.next()?;
+        let spec = format!("%{flags}{width}{precision}{}", self.verb);
+        let formatted = sprintf(&spec, std::slice::from_ref(value));
+        (!formatted.contains("%!")).then_some(formatted)
+    }
+}
+
+/// Reads the ASCII digits starting at `start` and returns them with the index
+/// just after them.
+fn take_digits(chars: &[char], start: usize) -> (String, usize) {
+    let end = start
+        + chars
+            .iter()
+            .skip(start)
+            .take_while(|c| c.is_ascii_digit())
+            .count();
+    (chars[start..end].iter().collect(), end)
+}
+
+#[cfg(test)]
+#[allow(clippy::approx_constant)]
+mod template_tests {
+    use serde_json::json;
+
+    use super::format_template;
+
+    fn format(template: &str, args: &[serde_json::Value]) -> Option<String> {
+        format_template(template, args)
+    }
+
+    #[test]
+    fn formats_like_go_format_template() {
+        assert_eq!(
+            format("Hello, %s!", &[json!("Gopher")]).as_deref(),
+            Some("Hello, Gopher!")
+        );
+        assert_eq!(
+            format("%s tem %d mensagens", &[json!("Ana"), json!(3)]).as_deref(),
+            Some("Ana tem 3 mensagens")
+        );
+        assert_eq!(
+            format("50%% off", &[json!("Gopher")]).as_deref(),
+            Some("50% off")
+        );
+        assert_eq!(
+            format("50% off", &[json!("Gopher")]).as_deref(),
+            Some("50% off")
+        );
+        assert_eq!(
+            format("[%10.3f]", &[json!(3.14159)]).as_deref(),
+            Some("[     3.142]")
+        );
+        assert_eq!(
+            format("%[2]s e %[1]s", &[json!("Ana"), json!("Bruno")]).as_deref(),
+            Some("Bruno e Ana")
+        );
+        assert_eq!(format("%z", &[json!("Ana")]).as_deref(), Some("%z"));
+        assert_eq!(format("100%", &[json!("Ana")]).as_deref(), Some("100%"));
+        assert_eq!(
+            format("%s", &[json!("Ana"), json!(3), json!(true)]).as_deref(),
+            Some("Ana")
+        );
+    }
+
+    #[test]
+    fn rejects_templates_that_cannot_be_formatted() {
+        assert_eq!(format("%s tem %d mensagens", &[json!("Ana")]), None);
+        assert_eq!(format("%d", &[json!("texto")]), None);
+        assert_eq!(format("%[3]s", &[json!("x"), json!(1)]), None);
+        assert_eq!(
+            format("%[1]*d", &[json!(3), json!(1)]).as_deref(),
+            Some("%[1]*d")
+        );
+    }
+
+    #[test]
+    fn star_width_and_precision_come_from_arguments() {
+        assert_eq!(
+            format("[%*d]", &[json!(4), json!(7)]).as_deref(),
+            Some("[   7]")
+        );
+        assert_eq!(
+            format("[%.*f]", &[json!(2), json!(3.14159)]).as_deref(),
+            Some("[3.14]")
+        );
+        assert_eq!(
+            format("[%*d]", &[json!(-4), json!(7)]).as_deref(),
+            Some("[7   ]")
+        );
+        assert_eq!(format("[%*d]", &[json!("x"), json!(7)]), None);
+    }
+
+    #[test]
+    fn never_emits_fmt_artifacts() {
+        let templates = [
+            "%s e %d", "50% off", "%z", "%d", "%w", "%", "%%", "%%s", "%[3]s",
+        ];
+        for template in templates {
+            if let Some(out) = format(template, &[json!("x"), json!(1)]) {
+                assert!(!out.contains("%!"), "{template:?} produced {out:?}");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::approx_constant)]
 mod tests {

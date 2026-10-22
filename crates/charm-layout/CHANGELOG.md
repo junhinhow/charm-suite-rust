@@ -5,6 +5,29 @@ All notable changes to this crate are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `Error` enum (`InvalidGap`, `InvalidSize`, `InvalidRatio`, `ZeroRatioSum`,
+  `InvalidColumns`) and `Dimension`, mirroring the sentinel errors of the Go
+  original (`errors.go`).
+- `Flex::validate`, `Flex::try_render`, `Flex::size`, `Flex::child_count`,
+  `Flex::children_copy`, and the same set on `Grid`, plus `Grid::try_new` and
+  `Grid::try_render`.
+- Integer geometry helpers ported from `geometry.go`: the largest remainder
+  split that always fills the container exactly, gap limiting and cell
+  fitting for wide characters.
+
+### Changed
+
+- Configuration errors are recorded while the containers are built, and
+  `render` clamps them to a valid geometry instead of panicking.
+
+### Known differences
+
+- Go's `ErrInvalidDirection` has no counterpart: `Direction` is a closed enum.
+
 ## [0.1.0]
 
 ### Added

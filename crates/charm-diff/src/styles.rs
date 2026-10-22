@@ -32,6 +32,20 @@ pub struct DiffStyle {
 }
 
 impl DiffStyle {
+    /// Returns whether none of the styles applies a visible transformation.
+    pub(crate) fn is_zero(&self) -> bool {
+        [
+            &self.addition,
+            &self.deletion,
+            &self.context,
+            &self.hunk_header,
+            &self.line_number,
+            &self.separator,
+        ]
+        .iter()
+        .all(|style| style.render("charm-diff-zero") == "charm-diff-zero")
+    }
+
     /// Returns a GitHub-inspired style with colored foregrounds and
     /// backgrounds.
     ///

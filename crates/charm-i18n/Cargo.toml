@@ -14,6 +14,8 @@ readme = "README.md"
 
 [dependencies]
 serde_json.workspace = true
+unicode-bidi.workspace = true
+unicode-segmentation.workspace = true
 
 [dev-dependencies]
 charm-parity = { path = "../../tools/parity" }

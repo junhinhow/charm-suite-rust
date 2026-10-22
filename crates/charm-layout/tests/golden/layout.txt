@@ -1,10 +1,10 @@
 === flex row com gap ===
-Sidebar      Main                      
-                                       
-                                       
-                                       
-                                       
-                                       
+Sidebar      Main                       
+                                        
+                                        
+                                        
+                                        
+                                        
 === flex row sem gap ===
 Esquerda            Direita             
                                         
@@ -14,9 +14,7 @@ Esquerda            Direita
 Header                        
                               
                               
-                              
 Body                          
-                              
                               
                               
                               
@@ -33,30 +31,35 @@ Base
                               
                               
 === flex ratio zero ===
-ZeroFull                
-                        
-                        
+Full                
+                    
+                    
 === flex ratios diferentes de um ===
-A         B         C         
-                              
-                              
+A             B            C            
+                                        
+                                        
 === flex gap maior que a largura ===
-A     B
-       
-       
+    
 === flex vazio ===
 
+=== flex razao invalida tolerante ===
+B                   
+                    
+=== flex soma de razoes zero tolerante ===
+A         B         
+                    
+=== flex tamanho negativo tolerante ===
+
 === grid tres colunas cinco filhos com gap ===
-Cell 1              Cell 2              Cell 3             
-                                                           
-                                                           
-                                                           
-                                                           
-                                                           
-Cell 4              Cell 5                                 
-                                                           
-                                                           
-                                                           
+Cell 1               Cell 2              Cell 3             
+                                                            
+                                                            
+                                                            
+                                                            
+Cell 4               Cell 5                                 
+                                                            
+                                                            
+                                                            
 === grid tres colunas cinco filhos sem gap ===
 Cell 1              Cell 2              Cell 3              
                                                             
@@ -78,3 +81,14 @@ B
                     
 === grid vazio ===
 
+=== grid gap maior que o espaco ===
+A        B        C        D        E        F        G        H                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                

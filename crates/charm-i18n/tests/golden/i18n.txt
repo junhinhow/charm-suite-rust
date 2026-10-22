@@ -12,7 +12,7 @@ missing=false
 hello=true
 bye=true
 only_pt=true
-only_en=false
+only_en=true
 missing=false
 ### T (locale=en)
 hello=Hello
@@ -39,15 +39,50 @@ missing.key=missing.key
 ### TF
 greeting=Hello, Alice! You have 5 messages.
 hello_noargs=Hello
-greeting_missing=Hello, Alice! You have %!d(MISSING) messages.
-hello_extra=Hello%!(EXTRA string=extra)
+greeting_missing=Hello, %s! You have %d messages.
+hello_extra=Hello
 ratio=Ratio: 3.14
 flag=Enabled: true
 quoted=He said "hi"
 generic=42
-percent_noargs=100%% done
-percent=100% done%!(EXTRA string=x)
-missing_key=missing.key%!(EXTRA string=arg)
+percent_noargs=100% done
+percent=100% done
+missing_key=missing.key
+### LOCALE NORMALIZATION
+locale=pt-BR
+norm_hello=Ola
+locale_de=de-DE
+norm_locale=en
+norm_locale=pt-BR
+### CHAIN
+only.br=Only BR has=true
+only.pt=Only PT has=true
+only.en=Only EN has=true
+shared=Shared BR has=true
+missing=missing has=false
+### IS_RTL
+ar-EG=true
+he=true
+fa-IR=true
+ur=true
+az-Arab=true
+az-Latn=false
+pt-BR=false
+en=false
+zh-Hant-TW=false
+=false
+ckb=true
+syr=true
+### REVERSE
+Hello => Hello
+שלום => םולש
+Hello שלום => Hello םולש
+שלום Hello => Hello םולש
+שלום 12 => 12 םולש
+café => café
+👨‍👩‍👧 => 👨‍👩‍👧
+ => 
+abc def => abc def
 ### LOAD JSON
 load_error=false
 json_hello=Hola

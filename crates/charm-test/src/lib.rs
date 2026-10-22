@@ -20,7 +20,7 @@
 //! }
 //!
 //! let mut sim = Simulator::new(Counter(0));
-//! sim.send_key("+");
+//! sim.send_key("+").unwrap_or(());
 //! require_view_contains(&sim, "Count: 1");
 //! ```
 
@@ -31,14 +31,19 @@ mod assert;
 mod keys;
 mod simulator;
 mod snapshot;
+mod view;
 
 pub use assert::{
     dump_messages, dump_view, require_view, require_view_contains, require_view_lines,
     require_view_not_contains, view_string,
 };
-pub use keys::key_msg;
-pub use simulator::{MessageRecord, Simulator, DEFAULT_HEIGHT, DEFAULT_WIDTH};
+pub use keys::{key_msg, KeyParseError};
+pub use simulator::{
+    every, tick, MessageRecord, Simulator, SimulatorOptions, DEFAULT_HEIGHT, DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_EVENTS, DEFAULT_MAX_MESSAGES, DEFAULT_WIDTH,
+};
 pub use snapshot::require_snapshot;
+pub use view::ViewSnapshot;
 
 #[cfg(test)]
 mod tests {
@@ -112,7 +117,11 @@ mod tests {
             ("ctrl+p", KeyType::CtrlP),
         ];
         for (name, expected) in cases {
-            assert_eq!(key_msg(name).key_type, expected, "key: {name}");
+            assert_eq!(
+                key_msg(name).map(|message| message.key_type),
+                Ok(expected),
+                "key: {name}"
+            );
         }
     }
 
@@ -121,17 +130,14 @@ mod tests {
         for character in ['x', 'é', '界'] {
             assert_eq!(
                 key_msg(&character.to_string()),
-                KeyMsg::from_char(character)
+                Ok(KeyMsg::from_char(character))
             );
         }
     }
 
     #[test]
-    fn unknown_multi_character_key_is_preserved_as_runes() {
-        assert_eq!(
-            key_msg("unknown").runes,
-            "unknown".chars().collect::<Vec<_>>()
-        );
+    fn unknown_multi_character_key_is_rejected() {
+        assert!(key_msg("unknown").is_err());
     }
 
     #[test]
@@ -180,7 +186,7 @@ mod tests {
     fn model_mut_and_send_keys_are_available() {
         let mut sim = Simulator::new(recording_model());
         sim.model_mut().value = 7;
-        sim.send_keys(&["a", "b"]);
+        sim.send_keys(&["a", "b"]).unwrap_or(());
         assert_eq!(sim.model().value, 7);
         assert_eq!(sim.model().keys.len(), 2);
     }

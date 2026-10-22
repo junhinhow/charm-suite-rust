@@ -1,7 +1,8 @@
 ---
 source: crates/charm-test/src/snapshot.rs
-expression: view
+expression: rendered
 ---
+content:
 Count: 0
 
 Press k/j to change, q to quit.

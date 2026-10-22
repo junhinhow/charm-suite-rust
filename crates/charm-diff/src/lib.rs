@@ -4,11 +4,10 @@
 //! `@@ -a,b +c,d @@` format) or as a **side-by-side diff** (two columns), using
 //! [Lip Gloss](https://github.com/charmbracelet/lipgloss) styles.
 //!
-//! The diff itself is computed with a dynamic-programming
-//! [longest common subsequence](https://en.wikipedia.org/wiki/Longest_common_subsequence)
-//! (LCS) algorithm, exactly like the Go original, so the produced output is
-//! byte-for-byte identical to `github.com/junhinhow/charm-diff` by default. A
-//! linear-space Myers algorithm is also available for large inputs.
+//! By default, the diff is computed with Git's `xdiff` engine: linear-space
+//! Myers with record cleanup and change compaction. This matches Git's hunk
+//! alignment. LCS and a simpler Myers variant remain selectable for
+//! compatibility with existing Rust callers.
 //!
 //! # Examples
 //!
@@ -33,7 +32,7 @@
 //! let opts = Options {
 //!     context_lines: 5,
 //!     style: DiffStyle::github(),
-//!     algorithm: Algorithm::Lcs,
+//!     algorithm: Algorithm::Xdiff,
 //! };
 //!
 //! let diff = side_by_side_diff_with_options("hello\nworld\n", "hello\nearth\n", 80, &opts);
@@ -46,6 +45,7 @@
 
 mod diff;
 mod styles;
+mod xdiff;
 
 pub use styles::DiffStyle;
 
@@ -61,8 +61,10 @@ pub use styles::DiffStyle;
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Algorithm {
-    /// Full LCS table. This is the default and matches the original Go output.
+    /// Git's xdiff-compatible linear-space Myers algorithm (the default).
     #[default]
+    Xdiff,
+    /// Full LCS table, retained for callers using the original Rust-only option.
     Lcs,
     /// Myers' shortest-edit-script algorithm using linear auxiliary space.
     Myers,
@@ -70,10 +72,9 @@ pub enum Algorithm {
 
 /// Configuration used when rendering a diff.
 ///
-/// The default algorithm is [`Algorithm::Lcs`], preserving byte-for-byte
-/// parity with the Go implementation. [`Algorithm::Myers`] uses linear
-/// auxiliary memory and may choose a different valid operation order when
-/// multiple shortest diffs are possible.
+/// The default algorithm is [`Algorithm::Xdiff`], matching the Go engine and
+/// Git's operation alignment. [`Algorithm::Lcs`] and [`Algorithm::Myers`]
+/// remain available as Rust-specific alternatives.
 ///
 /// # Examples
 ///
@@ -82,7 +83,7 @@ pub enum Algorithm {
 ///
 /// let opts = Options::default();
 /// assert_eq!(opts.context_lines, 3);
-/// assert_eq!(opts.algorithm, Algorithm::Lcs);
+/// assert_eq!(opts.algorithm, Algorithm::Xdiff);
 /// ```
 #[derive(Clone, Debug)]
 pub struct Options {
@@ -90,7 +91,7 @@ pub struct Options {
     pub context_lines: usize,
     /// Visual style used while rendering.
     pub style: DiffStyle,
-    /// Algorithm used to compute the diff (default: [`Algorithm::Lcs`]).
+    /// Algorithm used to compute the diff (default: [`Algorithm::Xdiff`]).
     pub algorithm: Algorithm,
 }
 
@@ -100,6 +101,25 @@ impl Default for Options {
             context_lines: 3,
             style: DiffStyle::default(),
             algorithm: Algorithm::default(),
+        }
+    }
+}
+
+impl Options {
+    /// Returns normalized rendering options.
+    ///
+    /// Rust's unsigned `context_lines` already rules out negative values. As
+    /// in Go's `normalizeOptions`, a zero-value style falls back to the default
+    /// terminal style.
+    pub(crate) fn normalize(&self) -> Self {
+        Self {
+            context_lines: self.context_lines,
+            style: if self.style.is_zero() {
+                DiffStyle::default()
+            } else {
+                self.style.clone()
+            },
+            algorithm: self.algorithm,
         }
     }
 }

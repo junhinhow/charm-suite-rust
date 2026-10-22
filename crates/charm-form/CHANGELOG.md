@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+* `Answers` with aggregate validation, pretty JSON serialization, and writer output.
+* `validate_field`, `normalize_type`, duplicate-name checks, and regex validation
+  during load and answer submission.
+* Interactive `renderer::Model`, `renderer::run`, and `run_with_options` using
+  `charmed-bubbletea`, plus the `charm-form` CLI (`-file`, `-out`, and
+  `-json=false`).
+* Go-port tests for validation, answer serialization, CLI summaries, renderer
+  keyboard behavior, scripted runs, and cancellation.
+* Go-generated parity coverage for form JSON, answers JSON, and validation.
+
+### Changed
+
+* `FormSpec::run` remains the specification-to-JSON helper; interactive answer
+  collection is provided by `renderer::run` and the CLI.
+
 ## [0.1.0] - 2026-10-22
 
 ### Added

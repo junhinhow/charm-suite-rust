@@ -28,7 +28,7 @@ impl Model for Counter {
 
 fn main() {
     let mut simulator = Simulator::new(Counter(0));
-    simulator.send_keys(&["k", "k", "k"]);
+    simulator.send_keys(&["k", "k", "k"]).expect("valid keys");
     require_view_contains(&simulator, "Count: 3");
     println!("{}", simulator.view());
 }

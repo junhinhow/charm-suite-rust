@@ -24,20 +24,31 @@
 //! assert!(rendered.starts_with("left      right"));
 //! ```
 //!
+//! # Errors
+//!
+//! Invalid configuration (negative sizes or gaps, invalid ratios, fewer than
+//! one column) is recorded while the containers are built. [`Flex::render`] and
+//! [`Grid::render`] clamp it to a valid geometry, while
+//! [`Flex::try_render`] and [`Grid::try_render`] return the [`Error`].
+//!
 //! # Parity with the Go original
 //!
-//! This crate is a faithful port of `github.com/junhinhow/charm-layout`.
-//! The space assigned to a child is computed as
-//! `int(ratio * float64(available))` — a *truncation*, not a rounding — so
-//! the output matches the Go implementation byte for byte.
+//! This crate is a port of `github.com/junhinhow/charm-layout`. The space is
+//! split with the largest remainder method: each child receives the integer
+//! part of its exact share, and the leftover columns go to the children with
+//! the largest fractions. The layout therefore always fills the container
+//! exactly, and the output matches the Go implementation.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+mod error;
+mod geometry;
 mod util;
 
 pub mod flex;
 pub mod grid;
 
+pub use error::{Dimension, Error};
 pub use flex::{Direction, Flex, FlexChild};
 pub use grid::Grid;

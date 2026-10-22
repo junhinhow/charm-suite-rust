@@ -4,11 +4,13 @@
 //! [`charm-i18n`](https://github.com/junhinhow/charm-suite). It provides:
 //!
 //! - a [`Catalog`] of messages organized by locale and key, with a fallback
-//!   locale;
+//!   chain (`pt-BR` → `pt` → fallback → base language of the fallback);
 //! - locale detection from `LC_ALL`, `LC_MESSAGES` and `LANG`
-//!   ([`detect_locale`]);
-//! - printf-style argument formatting ([`Catalog::tf`], see [`format::sprintf`]);
-//! - loading translations from JSON files ([`Catalog::load_json`]).
+//!   ([`detect_locale`]) and canonical locale codes;
+//! - formatting of translated templates ([`Catalog::tf`]);
+//! - loading translations from JSON files ([`Catalog::load_json`]);
+//! - right-to-left support: [`is_rtl`] and [`reverse`], which reorders text
+//!   for terminals that do not run the bidirectional algorithm themselves.
 //!
 //! # Examples
 //!
@@ -41,6 +43,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+mod bidi;
+mod grapheme;
+mod locale;
+mod rtl;
+
 pub mod format;
 
 use std::collections::BTreeMap;
@@ -49,7 +56,9 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-const DEFAULT_LOCALE: &str = "en";
+use crate::locale::{base_language, locale_key, parse_locale, DEFAULT_LOCALE};
+
+pub use rtl::{is_rtl, reverse};
 
 /// Errors returned when loading translations from a file.
 #[derive(Debug)]
@@ -103,9 +112,11 @@ impl std::error::Error for Error {
 
 /// A collection of translated messages organized by locale and key.
 ///
-/// The catalog starts with the `en` locale active and `en` as fallback. Keys
-/// missing from the active locale are looked up in the fallback locale, and
-/// when they are missing there too, [`Catalog::t`] returns the key itself.
+/// The catalog starts with the `en` locale active and `en` as fallback. Locale
+/// codes are normalized on the way in (`PT_br` is stored as `pt-BR`). Keys
+/// missing from the active locale are looked up in its base language, then in
+/// the fallback locale and its base language. When a key is missing from all
+/// of them, [`Catalog::t`] returns the key itself.
 ///
 /// # Examples
 ///
@@ -155,6 +166,9 @@ impl Catalog {
 
     /// Adds or replaces the messages of a locale.
     ///
+    /// The locale is normalized, so `PT_br` and `pt-BR` address the same
+    /// messages.
+    ///
     /// # Examples
     ///
     /// ```
@@ -163,15 +177,15 @@ impl Catalog {
     /// use charm_i18n::Catalog;
     ///
     /// let mut catalog = Catalog::new();
-    /// catalog.add_locale("pt-BR", BTreeMap::from([("hello".to_owned(), "Ola".to_owned())]));
+    /// catalog.add_locale("pt_br", BTreeMap::from([("hello".to_owned(), "Ola".to_owned())]));
     /// catalog.set_locale("pt-BR");
     /// assert_eq!(catalog.t("hello"), "Ola");
     /// ```
     pub fn add_locale(&mut self, locale: &str, messages: BTreeMap<String, String>) {
-        self.locales.insert(locale.to_owned(), messages);
+        self.locales.insert(locale_key(locale), messages);
     }
 
-    /// Sets the active locale.
+    /// Sets the active locale. The value is normalized.
     ///
     /// # Examples
     ///
@@ -179,14 +193,15 @@ impl Catalog {
     /// use charm_i18n::Catalog;
     ///
     /// let mut catalog = Catalog::new();
-    /// catalog.set_locale("pt-BR");
+    /// catalog.set_locale("PT_br.UTF-8");
     /// assert_eq!(catalog.locale(), "pt-BR");
     /// ```
     pub fn set_locale(&mut self, locale: &str) {
-        locale.clone_into(&mut self.locale);
+        self.locale = locale_key(locale);
     }
 
     /// Sets the locale used when a key is missing from the active locale.
+    /// The value is normalized.
     ///
     /// # Examples
     ///
@@ -197,12 +212,12 @@ impl Catalog {
     ///
     /// let mut catalog = Catalog::new();
     /// catalog.add_locale("pt-BR", BTreeMap::from([("bye".to_owned(), "Tchau".to_owned())]));
-    /// catalog.set_fallback("pt-BR");
+    /// catalog.set_fallback("pt_BR");
     /// catalog.set_locale("fr");
     /// assert_eq!(catalog.t("bye"), "Tchau");
     /// ```
     pub fn set_fallback(&mut self, locale: &str) {
-        locale.clone_into(&mut self.fallback);
+        self.fallback = locale_key(locale);
     }
 
     /// Returns the active locale.
@@ -210,9 +225,10 @@ impl Catalog {
         &self.locale
     }
 
-    /// Translates `key` using the active locale, then the fallback locale.
+    /// Translates `key` through the fallback chain.
     ///
-    /// Returns `key` itself when the key is not found in either locale.
+    /// Returns `key` itself when the key is not found in any locale of the
+    /// chain.
     ///
     /// # Examples
     ///
@@ -223,16 +239,16 @@ impl Catalog {
     /// assert_eq!(catalog.t("missing.key"), "missing.key");
     /// ```
     pub fn t<'a>(&'a self, key: &'a str) -> &'a str {
-        self.lookup(&self.locale, key)
-            .or_else(|| self.lookup(&self.fallback, key))
-            .unwrap_or(key)
+        self.lookup(key).unwrap_or(key)
     }
 
-    /// Translates `key` and formats the result with `args`.
+    /// Translates `key` and formats the translated template with `args`.
     ///
-    /// When `args` is empty the translated template is returned unchanged, as
-    /// in Go. Otherwise the template is formatted with [`format::sprintf`],
-    /// which accepts `%s`, `%d`, `%v`, `%f`, `%q`, `%t`, `%%` and `{}`.
+    /// The template follows Go's `Tf` semantics: `%s`, `%d`, `%v`, `%f`, `%q`,
+    /// `%t` and `%%` are interpreted, extra arguments are ignored, and when the
+    /// template cannot be formatted (missing arguments, a mismatched type) the
+    /// template is returned unchanged. Fmt diagnostics are never included.
+    /// A missing key returns the key itself without formatting.
     ///
     /// # Examples
     ///
@@ -254,13 +270,16 @@ impl Catalog {
     ///     catalog.tf("greeting", &[json!("Alice"), json!(5)]),
     ///     "Hello, Alice! You have 5 messages."
     /// );
+    /// assert_eq!(
+    ///     catalog.tf("greeting", &[json!("Alice")]),
+    ///     "Hello, %s! You have %d messages."
+    /// );
     /// ```
     pub fn tf(&self, key: &str, args: &[Value]) -> String {
-        let template = self.t(key);
-        if args.is_empty() {
-            return template.to_owned();
-        }
-        format::sprintf(template, args)
+        let Some(template) = self.lookup(key) else {
+            return key.to_owned();
+        };
+        format::format_template(template, args).unwrap_or_else(|| template.to_owned())
     }
 
     /// Loads translations from a JSON file shaped as
@@ -320,9 +339,8 @@ impl Catalog {
         self.locales.keys().map(String::as_str).collect()
     }
 
-    /// Reports whether `key` exists in the **active** locale.
-    ///
-    /// The fallback locale is not consulted, matching the Go implementation.
+    /// Reports whether `key` can be translated, following the same fallback
+    /// chain as [`Catalog::t`].
     ///
     /// # Examples
     ///
@@ -333,17 +351,37 @@ impl Catalog {
     ///
     /// let mut catalog = Catalog::new();
     /// catalog.add_locale("en", BTreeMap::from([("hello".to_owned(), "Hello".to_owned())]));
+    /// catalog.set_locale("fr");
     /// assert!(catalog.has("hello"));
     /// assert!(!catalog.has("missing"));
     /// ```
     pub fn has(&self, key: &str) -> bool {
-        self.locales
-            .get(&self.locale)
-            .is_some_and(|messages| messages.contains_key(key))
+        self.lookup(key).is_some()
     }
 
-    fn lookup<'a>(&'a self, locale: &str, key: &str) -> Option<&'a str> {
-        self.locales.get(locale)?.get(key).map(String::as_str)
+    /// Finds `key` in the first locale of the fallback chain that defines it.
+    fn lookup(&self, key: &str) -> Option<&str> {
+        self.fallback_chain()
+            .iter()
+            .find_map(|locale| self.locales.get(locale)?.get(key).map(String::as_str))
+    }
+
+    /// Search order: active locale, its base language, the fallback locale and
+    /// its base language. Duplicates and empty entries are dropped.
+    fn fallback_chain(&self) -> Vec<String> {
+        let candidates = [
+            self.locale.clone(),
+            base_language(&self.locale),
+            self.fallback.clone(),
+            base_language(&self.fallback),
+        ];
+        let mut chain: Vec<String> = Vec::with_capacity(candidates.len());
+        for candidate in candidates {
+            if !candidate.is_empty() && !chain.contains(&candidate) {
+                chain.push(candidate);
+            }
+        }
+        chain
     }
 }
 
@@ -353,7 +391,7 @@ impl Catalog {
 /// one that is set and not empty. Returns `"en"` when none of them is set.
 ///
 /// The value is normalized by removing the encoding (`.UTF-8`) and modifier
-/// (`@euro`) suffixes and replacing `_` with `-`: `pt_BR.UTF-8` becomes
+/// (`@euro`) suffixes and canonicalizing the rest: `pt_br.UTF-8` becomes
 /// `pt-BR`. The POSIX locales `C` and `POSIX` become `en`.
 ///
 /// # Examples
@@ -369,24 +407,6 @@ pub fn detect_locale() -> String {
         }
     }
     DEFAULT_LOCALE.to_owned()
-}
-
-/// Extracts the locale code from an environment variable value.
-///
-/// Examples: `pt_BR.UTF-8` becomes `pt-BR`, `en_US` becomes `en-US`, and `C`
-/// becomes `en`.
-fn parse_locale(raw: &str) -> String {
-    if raw == "C" || raw == "POSIX" {
-        return DEFAULT_LOCALE.to_owned();
-    }
-    let raw = raw.split('.').next().unwrap_or_default();
-    let raw = raw.split('@').next().unwrap_or_default();
-    let normalized = raw.replace('_', "-");
-    if normalized.is_empty() {
-        DEFAULT_LOCALE.to_owned()
-    } else {
-        normalized
-    }
 }
 
 #[cfg(test)]

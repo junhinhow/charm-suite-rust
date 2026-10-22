@@ -30,9 +30,9 @@ impl Model for Counter {
 fn counter_views_match_go_golden() {
     let mut simulator = Simulator::new(Counter(0));
     let mut output = format!("initial:\n{}\n", simulator.view());
-    simulator.send_keys(&["k", "k", "k"]);
+    simulator.send_keys(&["k", "k", "k"]).expect("valid keys");
     let _ = write!(output, "increment:\n{}\n", simulator.view());
-    simulator.send_keys(&["j", "j"]);
+    simulator.send_keys(&["j", "j"]).expect("valid keys");
     let _ = write!(output, "decrement:\n{}\n", simulator.view());
     simulator.resize(40, 10);
     let _ = write!(output, "resized 40x10:\n{}\n", simulator.view());

@@ -4,7 +4,7 @@
 //! `reference/go/charm-i18n/cmd/parity`:
 //!
 //! ```text
-//! cargo run -p charm-parity --bin parity -- gen crates/charm-i18n/tests/golden/i18n.txt -- go run ./reference/go/charm-i18n/cmd/parity
+//! cargo run -p charm-parity --bin parity -- gen crates/charm-i18n/tests/golden/i18n.txt -- go -C reference/go/charm-i18n run ./cmd/parity
 //! ```
 //!
 //! This test mirrors that program section by section. Keep both in sync.
@@ -14,9 +14,12 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
-use charm_i18n::Catalog;
+use charm_i18n::{is_rtl, reverse, Catalog};
 use charm_parity::assert_golden;
 use serde_json::json;
+
+const SHALOM: &str = "\u{5e9}\u{5dc}\u{5d5}\u{5dd}";
+const FAMILY: &str = "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}";
 
 fn msgs(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
@@ -127,6 +130,71 @@ fn i18n_parity() {
         cat.tf("missing.key", &[json!("arg")])
     )
     .expect("write");
+
+    out.push_str("### LOCALE NORMALIZATION\n");
+    let mut norm = Catalog::new();
+    norm.add_locale("EN", msgs(&[("hello", "Hello")]));
+    norm.add_locale("pt_br", msgs(&[("hello", "Ola")]));
+    norm.set_locale("PT_br.UTF-8");
+    writeln!(out, "locale={}", norm.locale()).expect("write");
+    writeln!(out, "norm_hello={}", norm.t("hello")).expect("write");
+    norm.set_locale("de_DE.UTF-8@euro");
+    writeln!(out, "locale_de={}", norm.locale()).expect("write");
+    for l in norm.locales() {
+        writeln!(out, "norm_locale={l}").expect("write");
+    }
+
+    out.push_str("### CHAIN\n");
+    let mut chain = Catalog::new();
+    chain.add_locale(
+        "en",
+        msgs(&[("only.en", "Only EN"), ("shared", "Shared EN")]),
+    );
+    chain.add_locale(
+        "pt",
+        msgs(&[("only.pt", "Only PT"), ("shared", "Shared PT")]),
+    );
+    chain.add_locale(
+        "pt-BR",
+        msgs(&[("only.br", "Only BR"), ("shared", "Shared BR")]),
+    );
+    chain.set_locale("pt-BR");
+    for k in ["only.br", "only.pt", "only.en", "shared", "missing"] {
+        writeln!(out, "{k}={} has={}", chain.t(k), chain.has(k)).expect("write");
+    }
+
+    out.push_str("### IS_RTL\n");
+    for l in [
+        "ar-EG",
+        "he",
+        "fa-IR",
+        "ur",
+        "az-Arab",
+        "az-Latn",
+        "pt-BR",
+        "en",
+        "zh-Hant-TW",
+        "",
+        "ckb",
+        "syr",
+    ] {
+        writeln!(out, "{l}={}", is_rtl(l)).expect("write");
+    }
+
+    out.push_str("### REVERSE\n");
+    for s in [
+        "Hello",
+        SHALOM,
+        "Hello \u{5e9}\u{5dc}\u{5d5}\u{5dd}",
+        "\u{5e9}\u{5dc}\u{5d5}\u{5dd} Hello",
+        "\u{5e9}\u{5dc}\u{5d5}\u{5dd} 12",
+        "caf\u{e9}",
+        FAMILY,
+        "",
+        "abc def",
+    ] {
+        writeln!(out, "{s} => {}", reverse(s)).expect("write");
+    }
 
     out.push_str("### LOAD JSON\n");
     let dir = tempfile::tempdir().expect("tempdir");

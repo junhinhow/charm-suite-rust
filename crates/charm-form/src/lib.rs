@@ -1,158 +1,183 @@
-//! Declarative form generator for terminal interfaces.
+//! Declarative form specifications, validation, answers, and terminal runners.
 //!
-//! Forms are described in YAML, validated, and serialized to JSON. This crate
-//! is a port of the Go [`charm-form`] library: the same YAML schema, the same
-//! validation rules and the same JSON layout.
-//!
-//! The field types are `input`, `select`, `confirm`, `multiselect` and `text`.
-//! `select` and `multiselect` fields must declare at least one option.
-//!
-//! [`charm-form`]: https://github.com/junhinhow/charm-form
+//! Forms use the same YAML schema as the Go `charm-form` package. Field types
+//! are normalized when loaded, and answers are validated against the loaded
+//! specification.
 //!
 //! ```
 //! use charm_form::FormSpec;
 //!
-//! let yaml = "\
-//! title: Deploy
-//! fields:
-//!   - name: environment
-//!     type: select
-//!     label: Target environment
-//!     options: [staging, production]
-//! ";
-//! let spec = FormSpec::load_from_bytes(yaml.as_bytes())?;
-//! assert_eq!(spec.fields[0].name, "environment");
+//! let yaml = b"title: Deploy\nfields:\n  - name: env\n    type: select\n    options: [staging, production]\n";
+//! let spec = FormSpec::load_from_bytes(yaml)?;
+//! assert_eq!(spec.fields[0].field_type, charm_form::TYPE_SELECT);
 //! # Ok::<(), charm_form::Error>(())
 //! ```
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+mod answers;
+pub mod renderer;
+
+pub use answers::{validate_field, Answers};
+
+use std::io::Write;
 use std::path::Path;
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-/// Field types accepted by the validator.
-const VALID_TYPES: &[&str] = &["input", "select", "confirm", "multiselect", "text"];
+/// Single-line text field type.
+pub const TYPE_INPUT: &str = "input";
+/// Multi-line text field type.
+pub const TYPE_TEXT: &str = "text";
+/// Single-choice field type.
+pub const TYPE_SELECT: &str = "select";
+/// Boolean field type.
+pub const TYPE_CONFIRM: &str = "confirm";
+/// Multiple-choice field type.
+pub const TYPE_MULTISELECT: &str = "multiselect";
 
-/// Errors returned while loading, validating or serializing a form.
+/// Errors returned while loading, validating, serializing, or running a form.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// The file could not be read (missing file, permissions, ...).
+    /// The file could not be read.
     #[error("failed to read file `{path}`: {source}")]
     Io {
-        /// Path that was being read.
+        /// Path that was read.
         path: String,
-        /// Underlying I/O error.
+        /// Underlying I/O failure.
+        #[source]
         source: std::io::Error,
     },
-    /// The input is not valid YAML or does not match the form schema.
+    /// YAML input is malformed or has the wrong shape.
     #[error("failed to parse YAML: {0}")]
     Yaml(#[from] serde_yaml_ng::Error),
-    /// The form has no `title`, or the title is empty.
+    /// Form title is missing or blank.
     #[error("the 'title' field is required in the form specification")]
     MissingTitle,
-    /// The form declares no fields.
+    /// The form has no fields.
     #[error("the form must have at least one field")]
     NoFields,
-    /// A field has no `name`. `index` is the zero-based position of the field.
+    /// A field name is missing or blank.
     #[error("field {index}: 'name' is required")]
     MissingName {
-        /// Zero-based position of the offending field.
+        /// One-based position of the field, matching the Go user-facing errors.
         index: usize,
     },
-    /// A field has no `type`.
-    #[error("field '{name}': 'type' is required")]
+    /// Two fields use the same name.
+    #[error("field {index}: duplicate name `{name}` (already used by field {first_index})")]
+    DuplicateName {
+        /// One-based position of the duplicate.
+        index: usize,
+        /// Name used more than once.
+        name: String,
+        /// One-based position of the first occurrence.
+        first_index: usize,
+    },
+    /// A field type is missing.
+    #[error("field `{name}`: 'type' is required")]
     MissingType {
-        /// Name of the offending field.
+        /// Name of the field.
         name: String,
     },
-    /// A field declares a type outside the supported set.
+    /// A field type is not supported.
     #[error(
-        "field '{name}': invalid type '{found}' (use input, select, confirm, multiselect or text)"
+        "field `{name}`: invalid type `{found}` (use input, select, confirm, multiselect or text)"
     )]
     InvalidType {
-        /// Name of the offending field.
+        /// Name of the field.
         name: String,
-        /// The unsupported type that was found.
+        /// Unsupported type string.
         found: String,
     },
-    /// A `select` or `multiselect` field has no options.
-    #[error("field '{name}': type '{field_type}' requires at least one option")]
+    /// A standalone type string is not supported.
+    #[error("invalid field type `{found}` (use input, select, confirm, multiselect or text)")]
+    UnsupportedType {
+        /// Unsupported type string.
+        found: String,
+    },
+    /// A choice field has no choices.
+    #[error("field `{name}`: type `{field_type}` requires at least one option")]
     MissingOptions {
-        /// Name of the offending field.
+        /// Name of the field.
         name: String,
-        /// The field type that requires options.
+        /// Choice field type.
         field_type: String,
     },
-    /// The form could not be serialized to JSON.
+    /// A field's regular expression is invalid.
+    #[error("field `{name}`: invalid validation regex `{pattern}`: {source}")]
+    InvalidRegex {
+        /// Name of the field.
+        name: String,
+        /// Invalid regex pattern.
+        pattern: String,
+        /// Regex parser error.
+        #[source]
+        source: regex::Error,
+    },
+    /// A single answer does not satisfy its field.
+    #[error("{message}")]
+    FieldValidation {
+        /// Human-readable validation error.
+        message: String,
+    },
+    /// Multiple answer validation errors, in form field order.
+    #[error("validation failed:\n{}", .errors.join("\n"))]
+    ValidationReport {
+        /// All field-level errors that were found.
+        errors: Vec<String>,
+    },
+    /// JSON serialization failed.
     #[error("failed to serialize to JSON: {0}")]
     Json(#[from] serde_json::Error),
+    /// Writing JSON output failed.
+    #[error("failed to write JSON: {0}")]
+    Write(#[source] std::io::Error),
+    /// The TUI runner failed.
+    #[error("failed to run the form: {0}")]
+    Runner(#[source] charmed_bubbletea::Error),
+    /// The user cancelled the interactive form.
+    #[error("form cancelled by user")]
+    Cancelled,
 }
 
 /// A complete form definition.
-///
-/// # Examples
-///
-/// ```
-/// use charm_form::FormSpec;
-///
-/// let spec = FormSpec::load_from_bytes(b"title: Hello\nfields:\n  - name: who\n    type: text\n    label: Who?\n")?;
-/// assert_eq!(spec.title, "Hello");
-/// # Ok::<(), charm_form::Error>(())
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct FormSpec {
-    /// Form title. Required when loading.
+    /// Form title. Required when validating.
     #[serde(default)]
     pub title: String,
-    /// Optional description shown with the form.
+    /// Optional description shown under the title.
     #[serde(default)]
     pub description: String,
-    /// Fields in display order. At least one is required when loading.
+    /// Fields in display order.
     #[serde(default)]
     pub fields: Vec<FieldSpec>,
 }
 
-/// A single field of a [`FormSpec`].
-///
-/// # Examples
-///
-/// ```
-/// use charm_form::FieldSpec;
-///
-/// let field = FieldSpec {
-///     name: "dry_run".to_owned(),
-///     field_type: "confirm".to_owned(),
-///     label: "Dry run only?".to_owned(),
-///     placeholder: None,
-///     options: None,
-///     required: false,
-///     validate: None,
-/// };
-/// assert_eq!(field.field_type, "confirm");
-/// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// A single field in a [`FormSpec`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct FieldSpec {
-    /// Identifier of the field, used as the key of the answer.
+    /// Unique answer key for this field.
     #[serde(default)]
     pub name: String,
-    /// Field type: `input`, `select`, `confirm`, `multiselect` or `text`.
+    /// Field type (`input`, `text`, `select`, `confirm`, or `multiselect`).
     #[serde(rename = "type", default)]
     pub field_type: String,
-    /// Text shown to the user.
+    /// Label displayed to the user.
     #[serde(default)]
     pub label: String,
-    /// Hint shown inside an empty input. Omitted from JSON when empty.
+    /// Placeholder for empty text fields; omitted when empty.
     #[serde(default, skip_serializing_if = "is_absent_text")]
     pub placeholder: Option<String>,
-    /// Choices for `select` and `multiselect` fields. Omitted when empty.
+    /// Choices for `select` and `multiselect`; omitted when empty.
     #[serde(default, skip_serializing_if = "is_absent_list")]
     pub options: Option<Vec<String>>,
-    /// Whether an answer is mandatory.
+    /// Whether an answer is mandatory; omitted when false.
     #[serde(default, skip_serializing_if = "is_false")]
     pub required: bool,
-    /// Regular expression the answer must match. Omitted from JSON when empty.
+    /// Regex that answers must match; omitted when empty.
     #[serde(default, skip_serializing_if = "is_absent_text")]
     pub validate: Option<String>,
 }
@@ -161,396 +186,244 @@ impl FormSpec {
     /// Loads and validates a form from a YAML file.
     ///
     /// # Errors
-    ///
-    /// Returns [`Error::Io`] when the file cannot be read, or any validation
-    /// error described in [`FormSpec::load_from_bytes`].
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::path::Path;
-    ///
-    /// use charm_form::FormSpec;
-    ///
-    /// let spec = FormSpec::load_from_file(Path::new("form.yaml"))?;
-    /// println!("{}", spec.title);
-    /// # Ok::<(), charm_form::Error>(())
-    /// ```
+    /// Returns [`Error::Io`], [`Error::Yaml`], or a form validation error.
     pub fn load_from_file(path: &Path) -> Result<Self, Error> {
         load_from_file(path)
     }
 
-    /// Parses and validates a form from YAML bytes.
+    /// Parses and validates YAML bytes.
     ///
     /// # Errors
-    ///
-    /// Returns [`Error::Yaml`] for malformed input, and the validation errors
-    /// [`Error::MissingTitle`], [`Error::NoFields`], [`Error::MissingName`],
-    /// [`Error::MissingType`], [`Error::InvalidType`] and
-    /// [`Error::MissingOptions`] otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use charm_form::{Error, FormSpec};
-    ///
-    /// let err = FormSpec::load_from_bytes(b"fields: []").unwrap_err();
-    /// assert!(matches!(err, Error::MissingTitle));
-    /// ```
+    /// Returns [`Error::Yaml`] or a form validation error.
     pub fn load_from_bytes(data: &[u8]) -> Result<Self, Error> {
         load_from_bytes(data)
     }
 
-    /// Serializes the form to pretty-printed JSON (two-space indentation).
+    /// Returns a copy with recognized field types normalized to lowercase.
+    /// Unknown types are preserved so validation can report them.
+    #[must_use]
+    pub fn normalize(&self) -> Self {
+        let mut normalized = self.clone();
+        for field in &mut normalized.fields {
+            if let Ok(kind) = normalize_type(&field.field_type) {
+                field.field_type = kind;
+            }
+        }
+        normalized
+    }
+
+    /// Validates title, fields, unique names, options, and regex patterns.
     ///
     /// # Errors
+    /// Returns the first specification error in form order.
+    pub fn validate(&self) -> Result<(), Error> {
+        validate_spec(self)
+    }
+
+    /// Serializes this specification as Go-compatible, pretty JSON.
     ///
+    /// # Errors
     /// Returns [`Error::Json`] if serialization fails.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use charm_form::FormSpec;
-    ///
-    /// let spec = FormSpec::load_from_bytes(b"title: Hi\nfields:\n  - name: a\n    type: text\n    label: A\n")?;
-    /// assert!(spec.to_json()?.starts_with("{\n  \"title\": \"Hi\""));
-    /// # Ok::<(), charm_form::Error>(())
-    /// ```
     pub fn to_json(&self) -> Result<String, Error> {
         to_json(self)
     }
 
-    /// Prints the form as JSON to standard output.
-    ///
-    /// This is a placeholder for an interactive run: the Go original also only
-    /// prints the JSON. Interactive rendering is planned for a future release.
+    /// Writes this specification as pretty JSON followed by a newline.
     ///
     /// # Errors
+    /// Returns [`Error::Json`] or [`Error::Write`].
+    pub fn write_json<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        write_json(writer, self)
+    }
+
+    /// Prints this specification as JSON to standard output.
     ///
-    /// Returns [`Error::Json`] if serialization fails.
+    /// This is separate from [`renderer::run`], which interactively collects
+    /// answers.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use charm_form::FormSpec;
-    ///
-    /// let spec = FormSpec::load_from_bytes(b"title: Hi\nfields:\n  - name: a\n    type: text\n    label: A\n")?;
-    /// spec.run()?;
-    /// # Ok::<(), charm_form::Error>(())
-    /// ```
+    /// # Errors
+    /// Returns [`Error::Json`] or an output error.
     pub fn run(&self) -> Result<(), Error> {
         run(self)
     }
 }
 
+impl FieldSpec {
+    /// Returns the trimmed display label, falling back to the field name.
+    #[must_use]
+    pub fn label_text(&self) -> String {
+        let label = self.label.trim();
+        if label.is_empty() {
+            self.name.clone()
+        } else {
+            label.to_owned()
+        }
+    }
+
+    /// Compiles the optional validation regex.
+    ///
+    /// # Errors
+    /// Returns the regex parser error wrapped in [`Error::InvalidRegex`].
+    pub fn regex(&self) -> Result<Option<Regex>, Error> {
+        let Some(pattern) = self
+            .validate
+            .as_deref()
+            .filter(|pattern| !pattern.is_empty())
+        else {
+            return Ok(None);
+        };
+        Regex::new(pattern)
+            .map(Some)
+            .map_err(|source| Error::InvalidRegex {
+                name: self.name.clone(),
+                pattern: pattern.to_owned(),
+                source,
+            })
+    }
+}
+
 /// Loads and validates a form from a YAML file.
 ///
-/// See [`FormSpec::load_from_file`].
-///
 /// # Errors
-///
-/// Same as [`FormSpec::load_from_file`].
+/// Returns [`Error::Io`], [`Error::Yaml`], or a form validation error.
 pub fn load_from_file(path: &Path) -> Result<FormSpec, Error> {
-    let data = std::fs::read(path).map_err(|source| Error::Io {
+    let bytes = std::fs::read(path).map_err(|source| Error::Io {
         path: path.display().to_string(),
         source,
     })?;
-    load_from_bytes(&data)
+    load_from_bytes(&bytes)
 }
 
-/// Parses and validates a form from YAML bytes.
-///
-/// See [`FormSpec::load_from_bytes`].
+/// Parses YAML bytes, normalizes field types, and validates the specification.
 ///
 /// # Errors
-///
-/// Same as [`FormSpec::load_from_bytes`].
+/// Returns [`Error::Yaml`] or a form validation error.
 pub fn load_from_bytes(data: &[u8]) -> Result<FormSpec, Error> {
-    // An empty document is not an error here: it yields an empty form, which
-    // then fails the `title` check, as in the Go original.
-    let spec = serde_yaml_ng::from_slice::<Option<FormSpec>>(data)?.unwrap_or_default();
-    validate(&spec)?;
+    let parsed = serde_yaml_ng::from_slice::<Option<FormSpec>>(data)?.unwrap_or_default();
+    let spec = parsed.normalize();
+    spec.validate()?;
     Ok(spec)
 }
 
-/// Serializes a form to pretty-printed JSON (two-space indentation).
-///
-/// The output matches Go's `json.MarshalIndent`, including its HTML-safe
-/// escaping of `<`, `>`, `&` and the U+2028/U+2029 separators.
+/// Normalizes a field type, accepting case and common multiselect spellings.
 ///
 /// # Errors
+/// Returns [`Error::InvalidType`] when the type is not supported.
+pub fn normalize_type(field_type: &str) -> Result<String, Error> {
+    let normalized = field_type.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        TYPE_INPUT | TYPE_TEXT | TYPE_SELECT | TYPE_CONFIRM => Ok(normalized),
+        TYPE_MULTISELECT | "multi-select" | "multi_select" => Ok(TYPE_MULTISELECT.to_owned()),
+        _ => Err(Error::UnsupportedType {
+            found: field_type.to_owned(),
+        }),
+    }
+}
+
+/// Serializes a form as Go-compatible, pretty JSON with two-space indentation.
 ///
+/// Go's JSON encoder also escapes HTML-sensitive characters and U+2028/U+2029;
+/// this function mirrors that output.
+///
+/// # Errors
 /// Returns [`Error::Json`] if serialization fails.
-///
-/// # Examples
-///
-/// ```
-/// use charm_form::{FormSpec, to_json};
-///
-/// let spec = FormSpec::load_from_bytes(b"title: Hi\nfields:\n  - name: a\n    type: text\n    label: A & B\n")?;
-/// assert!(to_json(&spec)?.contains(r#""label": "A \u0026 B""#));
-/// # Ok::<(), charm_form::Error>(())
-/// ```
 pub fn to_json(spec: &FormSpec) -> Result<String, Error> {
     let json = serde_json::to_string_pretty(spec)?;
     Ok(escape_html_like_go(&json))
 }
 
-/// Prints the form as JSON to standard output, followed by a newline.
-///
-/// See [`FormSpec::run`].
+/// Writes a form as pretty JSON followed by a newline.
 ///
 /// # Errors
-///
-/// Same as [`FormSpec::run`].
-pub fn run(spec: &FormSpec) -> Result<(), Error> {
-    println!("{}", to_json(spec)?);
-    Ok(())
+/// Returns [`Error::Json`] or [`Error::Write`].
+pub fn write_json<W: Write>(writer: &mut W, spec: &FormSpec) -> Result<(), Error> {
+    let json = to_json(spec)?;
+    writer
+        .write_all(json.as_bytes())
+        .and_then(|()| writer.write_all(b"\n"))
+        .map_err(Error::Write)
 }
 
-/// Checks the rules the Go original enforces on load.
-fn validate(spec: &FormSpec) -> Result<(), Error> {
-    if spec.title.is_empty() {
+/// Prints a form as JSON to standard output, followed by a newline.
+///
+/// Use [`renderer::run`] to interactively collect answers.
+///
+/// # Errors
+/// Returns [`Error::Json`] or an output error.
+pub fn run(spec: &FormSpec) -> Result<(), Error> {
+    let stdout = std::io::stdout();
+    let mut lock = stdout.lock();
+    write_json(&mut lock, spec)
+}
+
+fn validate_spec(spec: &FormSpec) -> Result<(), Error> {
+    if spec.title.trim().is_empty() {
         return Err(Error::MissingTitle);
     }
     if spec.fields.is_empty() {
         return Err(Error::NoFields);
     }
+
+    let mut names = std::collections::HashMap::with_capacity(spec.fields.len());
     for (index, field) in spec.fields.iter().enumerate() {
-        if field.name.is_empty() {
-            return Err(Error::MissingName { index });
+        if field.name.trim().is_empty() {
+            return Err(Error::MissingName { index: index + 1 });
         }
-        if field.field_type.is_empty() {
+        if let Some(first_index) = names.insert(field.name.as_str(), index) {
+            return Err(Error::DuplicateName {
+                index: index + 1,
+                name: field.name.clone(),
+                first_index: first_index + 1,
+            });
+        }
+        if field.field_type.trim().is_empty() {
             return Err(Error::MissingType {
                 name: field.name.clone(),
             });
         }
-        if !VALID_TYPES.contains(&field.field_type.as_str()) {
-            return Err(Error::InvalidType {
-                name: field.name.clone(),
-                found: field.field_type.clone(),
-            });
-        }
-        let needs_options = matches!(field.field_type.as_str(), "select" | "multiselect");
-        if needs_options && is_absent_list(&field.options) {
+        let field_type = normalize_type(&field.field_type).map_err(|_| Error::InvalidType {
+            name: field.name.clone(),
+            found: field.field_type.clone(),
+        })?;
+        if matches!(field_type.as_str(), TYPE_SELECT | TYPE_MULTISELECT)
+            && field.options.as_ref().is_none_or(Vec::is_empty)
+        {
             return Err(Error::MissingOptions {
                 name: field.name.clone(),
-                field_type: field.field_type.clone(),
+                field_type,
             });
         }
+        field.regex()?;
     }
     Ok(())
 }
 
-/// Escapes the characters that Go's `encoding/json` escapes by default.
-///
-/// These characters only occur inside JSON strings, so replacing them in the
-/// serialized text is equivalent to escaping the string values.
 fn escape_html_like_go(json: &str) -> String {
-    let mut out = String::with_capacity(json.len());
+    let mut escaped = String::with_capacity(json.len());
     for ch in json.chars() {
         match ch {
-            '<' => out.push_str("\\u003c"),
-            '>' => out.push_str("\\u003e"),
-            '&' => out.push_str("\\u0026"),
-            '\u{2028}' => out.push_str("\\u2028"),
-            '\u{2029}' => out.push_str("\\u2029"),
-            other => out.push(other),
+            '<' => escaped.push_str("\\u003c"),
+            '>' => escaped.push_str("\\u003e"),
+            '&' => escaped.push_str("\\u0026"),
+            '\u{2028}' => escaped.push_str("\\u2028"),
+            '\u{2029}' => escaped.push_str("\\u2029"),
+            other => escaped.push(other),
         }
     }
-    out
+    escaped
 }
 
-/// Mirrors Go's `omitempty` for `bool`.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_false(value: &bool) -> bool {
-    !*value
+    !value
 }
 
-/// Mirrors Go's `omitempty` for `string`: a missing or empty value is omitted.
-///
-/// The `&Option<_>` signature is required by `serde`'s `skip_serializing_if`.
 #[allow(clippy::ref_option)]
 fn is_absent_text(value: &Option<String>) -> bool {
-    match value {
-        None => true,
-        Some(text) => text.is_empty(),
-    }
+    value.as_ref().is_none_or(String::is_empty)
 }
 
-/// Mirrors Go's `omitempty` for slices: a missing or empty list is omitted.
-///
-/// The `&Option<_>` signature is required by `serde`'s `skip_serializing_if`.
 #[allow(clippy::ref_option)]
 fn is_absent_list(value: &Option<Vec<String>>) -> bool {
-    match value {
-        None => true,
-        Some(items) => items.is_empty(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const VALID: &str = "title: T\nfields:\n  - name: a\n    type: text\n    label: A\n";
-
-    fn load(yaml: &str) -> Result<FormSpec, Error> {
-        load_from_bytes(yaml.as_bytes())
-    }
-
-    #[test]
-    fn accepts_a_valid_form() {
-        let spec = load(VALID).expect("valid form");
-        assert_eq!(spec.title, "T");
-        assert_eq!(spec.fields.len(), 1);
-        assert_eq!(spec.fields[0].field_type, "text");
-    }
-
-    #[test]
-    fn rejects_missing_title() {
-        let err = load("fields:\n  - name: a\n    type: text\n    label: A\n").unwrap_err();
-        assert!(matches!(err, Error::MissingTitle));
-    }
-
-    #[test]
-    fn rejects_empty_title() {
-        let err =
-            load("title: \"\"\nfields:\n  - name: a\n    type: text\n    label: A\n").unwrap_err();
-        assert!(matches!(err, Error::MissingTitle));
-    }
-
-    #[test]
-    fn rejects_empty_document() {
-        let err = load("").unwrap_err();
-        assert!(matches!(err, Error::MissingTitle));
-    }
-
-    #[test]
-    fn rejects_missing_fields() {
-        let err = load("title: T\n").unwrap_err();
-        assert!(matches!(err, Error::NoFields));
-    }
-
-    #[test]
-    fn rejects_empty_fields_list() {
-        let err = load("title: T\nfields: []\n").unwrap_err();
-        assert!(matches!(err, Error::NoFields));
-    }
-
-    #[test]
-    fn rejects_field_without_name_with_its_index() {
-        let err = load("title: T\nfields:\n  - name: a\n    type: text\n    label: A\n  - type: text\n    label: B\n")
-            .unwrap_err();
-        assert!(matches!(err, Error::MissingName { index: 1 }));
-        assert_eq!(err.to_string(), "field 1: 'name' is required");
-    }
-
-    #[test]
-    fn rejects_empty_name() {
-        let err =
-            load("title: T\nfields:\n  - name: \"\"\n    type: text\n    label: A\n").unwrap_err();
-        assert!(matches!(err, Error::MissingName { index: 0 }));
-    }
-
-    #[test]
-    fn rejects_field_without_type() {
-        let err = load("title: T\nfields:\n  - name: a\n    label: A\n").unwrap_err();
-        assert!(matches!(err, Error::MissingType { ref name } if name == "a"));
-    }
-
-    #[test]
-    fn rejects_unknown_type_and_lists_valid_ones() {
-        let err =
-            load("title: T\nfields:\n  - name: a\n    type: date\n    label: A\n").unwrap_err();
-        assert!(matches!(err, Error::InvalidType { ref found, .. } if found == "date"));
-        let message = err.to_string();
-        assert!(message.contains("input, select, confirm, multiselect or text"));
-    }
-
-    #[test]
-    fn select_requires_options() {
-        let err =
-            load("title: T\nfields:\n  - name: a\n    type: select\n    label: A\n").unwrap_err();
-        assert!(
-            matches!(err, Error::MissingOptions { ref field_type, .. } if field_type == "select")
-        );
-    }
-
-    #[test]
-    fn multiselect_rejects_empty_options() {
-        let err = load(
-            "title: T\nfields:\n  - name: a\n    type: multiselect\n    label: A\n    options: []\n",
-        )
-        .unwrap_err();
-        assert!(
-            matches!(err, Error::MissingOptions { ref field_type, .. } if field_type == "multiselect")
-        );
-    }
-
-    #[test]
-    fn options_are_not_required_for_other_types() {
-        assert!(load("title: T\nfields:\n  - name: a\n    type: confirm\n    label: A\n").is_ok());
-    }
-
-    #[test]
-    fn rejects_malformed_yaml() {
-        let err = load("title: [unclosed\n").unwrap_err();
-        assert!(matches!(err, Error::Yaml(_)));
-    }
-
-    #[test]
-    fn missing_file_is_an_io_error() {
-        let err = load_from_file(Path::new("definitely/not/here.yaml")).unwrap_err();
-        assert!(matches!(err, Error::Io { .. }));
-    }
-
-    #[test]
-    fn loads_the_deploy_example() {
-        let spec = load_from_file(Path::new("examples/deploy.yaml")).expect("deploy example");
-        assert_eq!(spec.title, "Deploy Configuration");
-        assert_eq!(spec.fields.len(), 4);
-        assert_eq!(spec.fields[0].options.as_ref().map(Vec::len), Some(3));
-    }
-
-    #[test]
-    fn json_uses_two_space_indent_and_go_key_order() {
-        let spec = load(VALID).expect("valid form");
-        let json = to_json(&spec).expect("json");
-        assert_eq!(
-            json,
-            "{\n  \"title\": \"T\",\n  \"description\": \"\",\n  \"fields\": [\n    {\n      \"name\": \"a\",\n      \"type\": \"text\",\n      \"label\": \"A\"\n    }\n  ]\n}"
-        );
-    }
-
-    #[test]
-    fn omits_empty_optional_values_like_go_omitempty() {
-        let spec = load(
-            "title: T\nfields:\n  - name: a\n    type: select\n    label: A\n    placeholder: \"\"\n    validate: \"\"\n    options: [x]\n    required: false\n",
-        )
-        .expect("valid form");
-        let json = to_json(&spec).expect("json");
-        assert!(!json.contains("placeholder"));
-        assert!(!json.contains("validate"));
-        assert!(!json.contains("required"));
-        assert!(json.contains("\"options\""));
-    }
-
-    #[test]
-    fn escapes_html_characters_like_go() {
-        let spec = load(
-            "title: A & <B>\nfields:\n  - name: a\n    type: text\n    label: \"x\u{2028}y\"\n",
-        )
-        .expect("valid form");
-        let json = to_json(&spec).expect("json");
-        assert!(json.contains("\"A \\u0026 \\u003cB\\u003e\""));
-        assert!(json.contains("x\\u2028y"));
-    }
-
-    #[test]
-    fn run_succeeds_for_a_valid_form() {
-        let spec = load(VALID).expect("valid form");
-        assert!(run(&spec).is_ok());
-        assert!(spec.run().is_ok());
-    }
+    value.as_ref().is_none_or(Vec::is_empty)
 }

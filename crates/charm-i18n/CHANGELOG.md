@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `is_rtl` (right-to-left detection by language or script subtag) and
+  `reverse` (visual reordering with `unicode-bidi` and grapheme clusters from
+  `unicode-segmentation`), ported from `rtl.go` and `bidi.go`.
+- Canonical locale codes: `Catalog` normalizes locales on `add_locale`,
+  `set_locale` and `set_fallback` (`PT_br.UTF-8` becomes `pt-BR`).
+- Fallback chain: the active locale, its base language, the fallback locale
+  and its base language. `has` follows the same chain as `t`.
+
+### Changed
+
+- `Catalog::tf` formats templates the way the Go `Tf` does: extra arguments
+  are ignored, a template that cannot be formatted is returned unchanged, and
+  a missing key returns the key without formatting.
+- `detect_locale` normalizes the case of the value (`pt_br` becomes `pt-BR`).
+
+### Known differences
+
+- `%g` and `%G` are not supported by `Tf`: the template is returned unchanged,
+  while Go would format the value.
+- The `{}` placeholders of `format::sprintf` are a Rust extension and are not
+  interpreted by `Catalog::tf`, which follows Go.
+- Grapheme clusters follow `unicode-segmentation` (full UAX #29), which can
+  split a few rare sequences differently from the Go subset.
+
 ## [0.1.0] - 2026-10-22
 
 ### Added
