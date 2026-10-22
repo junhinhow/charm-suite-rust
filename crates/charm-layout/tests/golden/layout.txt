@@ -1,0 +1,80 @@
+=== flex row com gap ===
+Sidebar      Main                      
+                                       
+                                       
+                                       
+                                       
+                                       
+=== flex row sem gap ===
+Esquerda            Direita             
+                                        
+                                        
+                                        
+=== flex column com gap ===
+Header                        
+                              
+                              
+                              
+Body                          
+                              
+                              
+                              
+                              
+                              
+                              
+                              
+Footer                        
+                              
+=== flex column sem gap ===
+Topo                          
+                              
+                              
+Base                          
+                              
+                              
+=== flex ratio zero ===
+ZeroFull                
+                        
+                        
+=== flex ratios diferentes de um ===
+A         B         C         
+                              
+                              
+=== flex gap maior que a largura ===
+A     B
+       
+       
+=== flex vazio ===
+
+=== grid tres colunas cinco filhos com gap ===
+Cell 1              Cell 2              Cell 3             
+                                                           
+                                                           
+                                                           
+                                                           
+                                                           
+Cell 4              Cell 5                                 
+                                                           
+                                                           
+                                                           
+=== grid tres colunas cinco filhos sem gap ===
+Cell 1              Cell 2              Cell 3              
+                                                            
+                                                            
+Cell 4              Cell 5                                  
+                                                            
+                                                            
+=== grid numero impar de filhos ===
+A              B              
+                              
+                              
+C                             
+                              
+                              
+=== grid zero colunas ===
+A                   
+                    
+B                   
+                    
+=== grid vazio ===
+

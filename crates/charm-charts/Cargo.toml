@@ -1,0 +1,23 @@
+[package]
+name = "charm-charts"
+description = "Graficos de terminal: sparklines, barras e barras de progresso."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["charts", "sparkline", "terminal", "tui", "charm"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+charm-core.workspace = true
+lipgloss.workspace = true
+
+[dev-dependencies]
+charm-parity.workspace = true
+
+[lints]
+workspace = true

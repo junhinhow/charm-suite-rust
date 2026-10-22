@@ -1,0 +1,22 @@
+[package]
+name = "charm-spinner"
+description = "30+ animacoes de spinner para terminais."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["spinner", "terminal", "tui", "charm", "animation"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+lipgloss.workspace = true
+
+[dev-dependencies]
+charm-parity.workspace = true
+
+[lints]
+workspace = true

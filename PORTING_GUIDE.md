@@ -133,7 +133,8 @@ crates/<lib>/
 │   ├── lib.rs
 │   └── ...
 ├── examples/
-│   └── demo.rs
+│   └── <crate>_demo.rs      # NOME UNICO: o alvo de exemplo do Cargo e o nome
+│                            # do arquivo; dois `demo.rs` colidem no target/
 └── tests/
     ├── parity.rs        # testes de paridade com o Go
     └── golden/

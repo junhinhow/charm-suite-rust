@@ -1,0 +1,83 @@
+# charm-color parity vectors
+# <op> <args> -> <#rrggbb/alpha>
+[darken]
+darken 200 100 50 255 0.0000 -> #c86432/255
+darken 200 100 50 255 0.2500 -> #964b25/255
+darken 200 100 50 255 0.5000 -> #643219/255
+darken 200 100 50 255 0.7500 -> #32190c/255
+darken 200 100 50 255 1.0000 -> #000000/255
+darken 200 100 50 255 1.5000 -> #000000/255
+darken 200 100 50 255 -0.5000 -> #c86432/255
+darken 255 255 255 255 0.5000 -> #7f7f7f/255
+darken 0 0 0 255 0.3000 -> #000000/255
+darken 12 34 56 128 0.4000 -> #030a10/128
+[lighten]
+lighten 100 50 25 255 0.0000 -> #643219/255
+lighten 100 50 25 255 0.2500 -> #8a6552/255
+lighten 100 50 25 255 0.5000 -> #b1988c/255
+lighten 100 50 25 255 0.7500 -> #d8cbc5/255
+lighten 100 50 25 255 1.0000 -> #ffffff/255
+lighten 100 50 25 255 1.5000 -> #ffffff/255
+lighten 100 50 25 255 -0.5000 -> #643219/255
+lighten 0 0 0 255 0.5000 -> #7f7f7f/255
+lighten 255 255 255 255 0.2500 -> #ffffff/255
+lighten 12 34 56 128 0.4000 -> #697076/128
+[blend]
+blend 0 0 0 255 255 255 255 255 0.0000 -> #000000/255
+blend 0 0 0 255 255 255 255 255 0.2500 -> #3f3f3f/255
+blend 0 0 0 255 255 255 255 255 0.5000 -> #7f7f7f/255
+blend 0 0 0 255 255 255 255 255 0.7500 -> #bfbfbf/255
+blend 0 0 0 255 255 255 255 255 1.0000 -> #ffffff/255
+blend 0 0 0 255 255 255 255 255 1.5000 -> #ffffff/255
+blend 0 0 0 255 255 255 255 255 -0.5000 -> #000000/255
+blend 255 0 0 255 0 0 255 255 0.5000 -> #7f007f/255
+blend 10 20 30 255 40 50 60 255 0.3300 -> #131d27/255
+blend 10 20 30 128 40 50 60 255 0.5000 -> #161e25/191
+[contrast]
+contrast 0 0 0 255 -> #ffffff/255
+contrast 255 255 255 255 -> #000000/255
+contrast 200 100 50 255 -> #000000/255
+contrast 128 128 128 255 -> #000000/255
+contrast 255 0 0 255 -> #000000/255
+contrast 0 255 0 255 -> #000000/255
+contrast 0 0 255 255 -> #ffffff/255
+contrast 250 189 47 255 -> #000000/255
+[complementary]
+complementary 255 0 0 255 -> #00ffff/255
+complementary 200 100 50 255 -> #379bcd/255
+complementary 0 0 0 255 -> #ffffff/255
+complementary 255 255 255 255 -> #000000/255
+complementary 18 52 86 255 -> #edcba9/255
+[palette]
+palette 255 0 0 255 4 -> #ff0000/255, #80ff00/255, #00ffff/255, #7f00ff/255
+palette 52 152 219 255 6 -> #3498db/255, #7734db/255, #db3498/255, #db7734/255, #98db34/255, #34db77/255
+palette 128 128 128 255 3 -> #808080/255, #808080/255, #808080/255
+palette 255 0 255 255 4 -> #ff00ff/255, #ff8000/255, #00ff00/255, #007fff/255
+palette 0 255 0 255 3 -> #00ff00/255, #0000ff/255, #ff0000/255
+palette 0 0 255 255 3 -> #0000ff/255, #ff0000/255, #00ff00/255
+palette 250 189 47 255 5 -> #fabd2f/255, #43fa2f/255, #2fe6fa/255, #6c2ffa/255, #fa2f95/255
+palette 255 0 0 255 1 -> #ff0000/255
+palette 255 0 0 255 0 -> (empty)
+[tohex]
+tohex 255 128 0 255 -> #ff8000
+tohex 0 0 0 255 -> #000000
+tohex 255 255 255 255 -> #ffffff
+tohex 200 100 50 255 -> #c86432
+[fromhex]
+fromhex "#ff8000" -> #ff8000/255
+fromhex "00ff00" -> #00ff00/255
+fromhex "invalid" -> #000000/255
+fromhex "#ff00" -> #000000/255
+fromhex "" -> #000000/255
+fromhex "#zzzzzz" -> #000000/255
+fromhex "ABCDEF" -> #abcdef/255
+[fromlipgloss]
+fromlipgloss "#ff8000" -> #ff8000/255
+fromlipgloss "#fff" -> #ffffff/255
+fromlipgloss "63" -> #5f5fff/255
+fromlipgloss "5" -> #800080/255
+fromlipgloss "255" -> #eeeeee/255
+fromlipgloss "1" -> #800000/255
+fromlipgloss "invalid" -> #000000/255
+fromlipgloss "" -> #000000/255
+fromlipgloss "#zzz" -> #000000/255

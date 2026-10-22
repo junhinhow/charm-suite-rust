@@ -10,6 +10,12 @@ homepage.workspace = true
 authors.workspace = true
 publish = false
 
+# Alias so the documented workflow works:
+#   cargo run -p charm-parity --bin parity -- gen <golden> -- <command>
+[[bin]]
+name = "parity"
+path = "src/main.rs"
+
 [dependencies]
 charm-core.workspace = true
 

@@ -1,0 +1,191 @@
+themes=5
+name=catppuccin
+name=dracula
+name=gruvbox
+name=nord
+name=tokyo-night
+theme catppuccin
+  background=#1e1e2e
+  foreground=#cdd6f4
+  primary=#cba6f7
+  secondary=#a6e3a1
+  accent=#f5c2e7
+  success=#a6e3a1
+  warning=#f9e2af
+  error=#f38ba8
+  info=#89b4fa
+  muted=#585b70
+  syntax.keyword=#cba6f7
+  syntax.string=#a6e3a1
+  syntax.number=#fab387
+  syntax.comment=#585b70
+  syntax.function=#89b4fa
+  syntax.type=#f9e2af
+  syntax.operator=#89dceb
+  syntax.constant=#fab387
+theme dracula
+  background=#282a36
+  foreground=#f8f8f2
+  primary=#bd93f9
+  secondary=#50fa7b
+  accent=#ff79c6
+  success=#50fa7b
+  warning=#ffb86c
+  error=#ff5555
+  info=#8be9fd
+  muted=#6272a4
+  syntax.keyword=#ff79c6
+  syntax.string=#f1fa8c
+  syntax.number=#bd93f9
+  syntax.comment=#6272a4
+  syntax.function=#50fa7b
+  syntax.type=#8be9fd
+  syntax.operator=#ff79c6
+  syntax.constant=#bd93f9
+theme gruvbox
+  background=#282828
+  foreground=#ebdbb2
+  primary=#fabd2f
+  secondary=#b8bb26
+  accent=#83a598
+  success=#b8bb26
+  warning=#fe8019
+  error=#fb4934
+  info=#83a598
+  muted=#928374
+  syntax.keyword=#fb4934
+  syntax.string=#b8bb26
+  syntax.number=#d3869b
+  syntax.comment=#928374
+  syntax.function=#b8bb26
+  syntax.type=#fabd2f
+  syntax.operator=#fe8019
+  syntax.constant=#d3869b
+theme nord
+  background=#2e3440
+  foreground=#d8dee9
+  primary=#88c0d0
+  secondary=#a3be8c
+  accent=#b48ead
+  success=#a3be8c
+  warning=#ebcb8b
+  error=#bf616a
+  info=#5e81ac
+  muted=#4c566a
+  syntax.keyword=#81a1c1
+  syntax.string=#a3be8c
+  syntax.number=#b48ead
+  syntax.comment=#616e88
+  syntax.function=#88c0d0
+  syntax.type=#8fbcbb
+  syntax.operator=#81a1c1
+  syntax.constant=#b48ead
+theme tokyo-night
+  background=#1a1b26
+  foreground=#a9b1d6
+  primary=#7aa2f7
+  secondary=#9ece6a
+  accent=#bb9af7
+  success=#9ece6a
+  warning=#e0af68
+  error=#f7768e
+  info=#7dcfff
+  muted=#565f89
+  syntax.keyword=#bb9af7
+  syntax.string=#9ece6a
+  syntax.number=#ff9e64
+  syntax.comment=#565f89
+  syntax.function=#7aa2f7
+  syntax.type=#2ac3de
+  syntax.operator=#89ddff
+  syntax.constant=#ff9e64
+styles catppuccin
+  base=[38;2;205;214;244mBase text[m
+  bold=[1;38;2;205;214;244mBold text[m
+  italic=[3;38;2;205;214;244mItalic text[m
+  faint=[38;2;88;91;112mFaint text[m
+  success=[38;2;166;227;161mSuccess[m
+  warning=[38;2;249;226;175mWarning[m
+  error=[38;2;243;139;168mError[m
+  info=[38;2;137;180;250mInfo[m
+  title=[1;38;2;203;166;247mTitle[m
+  subtitle=[38;2;166;227;161mSubtitle[m
+  highlight=[1;38;2;245;194;231mHighlight[m
+  border=[38;2;88;91;112m╭─────────────────╮[m
+[38;2;88;91;112m│[m                 [38;2;88;91;112m│[m
+[38;2;88;91;112m│[m  Boxed content  [38;2;88;91;112m│[m
+[38;2;88;91;112m│[m                 [38;2;88;91;112m│[m
+[38;2;88;91;112m╰─────────────────╯[m
+  code=[38;2;166;227;161;48;2;30;30;46mcode[m
+styles dracula
+  base=[38;2;248;248;242mBase text[m
+  bold=[1;38;2;248;248;242mBold text[m
+  italic=[3;38;2;248;248;242mItalic text[m
+  faint=[38;2;98;114;164mFaint text[m
+  success=[38;2;80;250;123mSuccess[m
+  warning=[38;2;255;184;108mWarning[m
+  error=[38;2;255;85;85mError[m
+  info=[38;2;139;233;253mInfo[m
+  title=[1;38;2;189;147;249mTitle[m
+  subtitle=[38;2;80;250;123mSubtitle[m
+  highlight=[1;38;2;255;121;198mHighlight[m
+  border=[38;2;98;114;164m╭─────────────────╮[m
+[38;2;98;114;164m│[m                 [38;2;98;114;164m│[m
+[38;2;98;114;164m│[m  Boxed content  [38;2;98;114;164m│[m
+[38;2;98;114;164m│[m                 [38;2;98;114;164m│[m
+[38;2;98;114;164m╰─────────────────╯[m
+  code=[38;2;241;250;140;48;2;40;42;54mcode[m
+styles gruvbox
+  base=[38;2;235;219;178mBase text[m
+  bold=[1;38;2;235;219;178mBold text[m
+  italic=[3;38;2;235;219;178mItalic text[m
+  faint=[38;2;146;131;116mFaint text[m
+  success=[38;2;184;187;38mSuccess[m
+  warning=[38;2;254;128;25mWarning[m
+  error=[38;2;251;73;52mError[m
+  info=[38;2;131;165;152mInfo[m
+  title=[1;38;2;250;189;47mTitle[m
+  subtitle=[38;2;184;187;38mSubtitle[m
+  highlight=[1;38;2;131;165;152mHighlight[m
+  border=[38;2;146;131;116m╭─────────────────╮[m
+[38;2;146;131;116m│[m                 [38;2;146;131;116m│[m
+[38;2;146;131;116m│[m  Boxed content  [38;2;146;131;116m│[m
+[38;2;146;131;116m│[m                 [38;2;146;131;116m│[m
+[38;2;146;131;116m╰─────────────────╯[m
+  code=[38;2;184;187;38;48;2;40;40;40mcode[m
+styles nord
+  base=[38;2;216;222;233mBase text[m
+  bold=[1;38;2;216;222;233mBold text[m
+  italic=[3;38;2;216;222;233mItalic text[m
+  faint=[38;2;76;86;106mFaint text[m
+  success=[38;2;163;190;140mSuccess[m
+  warning=[38;2;235;203;139mWarning[m
+  error=[38;2;191;97;106mError[m
+  info=[38;2;94;129;172mInfo[m
+  title=[1;38;2;136;192;208mTitle[m
+  subtitle=[38;2;163;190;140mSubtitle[m
+  highlight=[1;38;2;180;142;173mHighlight[m
+  border=[38;2;76;86;106m╭─────────────────╮[m
+[38;2;76;86;106m│[m                 [38;2;76;86;106m│[m
+[38;2;76;86;106m│[m  Boxed content  [38;2;76;86;106m│[m
+[38;2;76;86;106m│[m                 [38;2;76;86;106m│[m
+[38;2;76;86;106m╰─────────────────╯[m
+  code=[38;2;163;190;140;48;2;46;52;64mcode[m
+styles tokyo-night
+  base=[38;2;169;177;214mBase text[m
+  bold=[1;38;2;169;177;214mBold text[m
+  italic=[3;38;2;169;177;214mItalic text[m
+  faint=[38;2;86;95;137mFaint text[m
+  success=[38;2;158;206;106mSuccess[m
+  warning=[38;2;224;175;104mWarning[m
+  error=[38;2;247;118;142mError[m
+  info=[38;2;125;207;255mInfo[m
+  title=[1;38;2;122;162;247mTitle[m
+  subtitle=[38;2;158;206;106mSubtitle[m
+  highlight=[1;38;2;187;154;247mHighlight[m
+  border=[38;2;86;95;137m╭─────────────────╮[m
+[38;2;86;95;137m│[m                 [38;2;86;95;137m│[m
+[38;2;86;95;137m│[m  Boxed content  [38;2;86;95;137m│[m
+[38;2;86;95;137m│[m                 [38;2;86;95;137m│[m
+[38;2;86;95;137m╰─────────────────╯[m
+  code=[38;2;158;206;106;48;2;26;27;38mcode[m

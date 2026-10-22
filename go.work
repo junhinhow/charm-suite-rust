@@ -1,0 +1,22 @@
+go 1.26.1
+
+use (
+	./reference/go/charm-banner
+	./reference/go/charm-charts
+	./reference/go/charm-color
+	./reference/go/charm-devtools
+	./reference/go/charm-dialog
+	./reference/go/charm-diff
+	./reference/go/charm-form
+	./reference/go/charm-i18n
+	./reference/go/charm-layout
+	./reference/go/charm-nav
+	./reference/go/charm-notify
+	./reference/go/charm-palette
+	./reference/go/charm-spinner
+	./reference/go/charm-table-cli
+	./reference/go/charm-test
+	./reference/go/charm-themes
+	./reference/go/charm-toast
+	./reference/go/charm-wizard
+)

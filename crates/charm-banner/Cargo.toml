@@ -1,0 +1,23 @@
+[package]
+name = "charm-banner"
+description = "Gerador de banners ASCII art estilizados para terminais."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/charm-banner"
+authors.workspace = true
+keywords = ["banner", "ascii", "terminal", "tui", "charm"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+lipgloss.workspace = true
+
+[dev-dependencies]
+charm-parity.workspace = true
+
+[lints]
+workspace = true

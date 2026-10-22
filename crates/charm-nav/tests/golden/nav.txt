@@ -1,0 +1,62 @@
+=== tabs padrao ===
+[1;4;38;2;125;86;244;4mH[m[1;4;38;2;125;86;244;4mo[m[1;4;38;2;125;86;244;4mm[m[1;4;38;2;125;86;244;4me[m | [38;2;102;102;102mSettings[m | [38;2;102;102;102mAbout[m
+active=0
+items=Home,Settings,About
+=== tabs apos next ===
+[38;2;102;102;102mHome[m | [1;4;38;2;125;86;244;4mS[m[1;4;38;2;125;86;244;4me[m[1;4;38;2;125;86;244;4mt[m[1;4;38;2;125;86;244;4mt[m[1;4;38;2;125;86;244;4mi[m[1;4;38;2;125;86;244;4mn[m[1;4;38;2;125;86;244;4mg[m[1;4;38;2;125;86;244;4ms[m | [38;2;102;102;102mAbout[m
+active=1
+=== tabs apos previous ===
+[1;4;38;2;125;86;244;4mH[m[1;4;38;2;125;86;244;4mo[m[1;4;38;2;125;86;244;4mm[m[1;4;38;2;125;86;244;4me[m | [38;2;102;102;102mSettings[m | [38;2;102;102;102mAbout[m
+active=0
+=== tabs previous no inicio ===
+[38;2;102;102;102mHome[m | [38;2;102;102;102mSettings[m | [1;4;38;2;125;86;244;4mA[m[1;4;38;2;125;86;244;4mb[m[1;4;38;2;125;86;244;4mo[m[1;4;38;2;125;86;244;4mu[m[1;4;38;2;125;86;244;4mt[m
+active=2
+=== tabs set active fora do intervalo ===
+active=2
+=== tabs set active valido ===
+[38;2;102;102;102mHome[m | [38;2;102;102;102mSettings[m | [1;4;38;2;125;86;244;4mA[m[1;4;38;2;125;86;244;4mb[m[1;4;38;2;125;86;244;4mo[m[1;4;38;2;125;86;244;4mu[m[1;4;38;2;125;86;244;4mt[m
+active=2
+=== tabs vazio ===
+
+active=0
+=== sidebar padrao ===
+ [38;2;102;102;102m    Dashboard[m      
+ [1;38;2;125;86;244;48;2;26;26;46m▸ Users[m            
+ [38;2;102;102;102m    Settings[m       
+ [38;2;102;102;102m    Logs[m           
+selected=1
+=== sidebar apos next ===
+ [38;2;102;102;102m    Dashboard[m      
+ [38;2;102;102;102m    Users[m          
+ [1;38;2;125;86;244;48;2;26;26;46m▸ Settings[m         
+ [38;2;102;102;102m    Logs[m           
+selected=2
+=== sidebar apos previous ===
+ [38;2;102;102;102m    Dashboard[m      
+ [1;38;2;125;86;244;48;2;26;26;46m▸ Users[m            
+ [38;2;102;102;102m    Settings[m       
+ [38;2;102;102;102m    Logs[m           
+selected=1
+=== sidebar previous no inicio ===
+ [38;2;102;102;102m    Dashboard[m      
+ [38;2;102;102;102m    Users[m          
+ [38;2;102;102;102m    Settings[m       
+ [1;38;2;125;86;244;48;2;26;26;46m▸ Logs[m             
+selected=3
+=== sidebar set selected fora do intervalo ===
+selected=3
+=== sidebar largura e cursor customizados ===
+ [1;38;2;125;86;244;48;2;26;26;46m> Dashboard[m                  
+ [38;2;102;102;102m  Users[m                      
+=== sidebar vazio ===
+
+selected=0
+=== breadcrumb padrao ===
+[38;2;102;102;102mHome[m > [38;2;102;102;102mSettings[m > [1;38;2;125;86;244mProfile[m
+items=Home,Settings,Profile
+=== breadcrumb apos pop ===
+pop=Profile
+[38;2;102;102;102mHome[m > [1;38;2;125;86;244mSettings[m
+=== breadcrumb pop vazio ===
+pop=
+
