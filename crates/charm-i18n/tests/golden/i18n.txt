@@ -1,0 +1,61 @@
+### LOCALE
+en
+### LOCALES
+en
+pt-BR
+### HAS (locale=en)
+hello=true
+bye=true
+only_pt=false
+missing=false
+### HAS (locale=pt-BR)
+hello=true
+bye=true
+only_pt=true
+only_en=false
+missing=false
+### T (locale=en)
+hello=Hello
+bye=Goodbye
+only_pt=only_pt
+only_en=English only
+missing.key=missing.key
+### T (locale=pt-BR)
+hello=Ola
+bye=Tchau
+only_pt=Somente pt-BR
+only_en=English only
+missing.key=missing.key
+### T (locale=fr, fallback=en)
+hello=Hello
+bye=Goodbye
+only_pt=only_pt
+missing.key=missing.key
+### T (locale=fr, fallback=pt-BR)
+hello=Ola
+only_pt=Somente pt-BR
+only_en=only_en
+missing.key=missing.key
+### TF
+greeting=Hello, Alice! You have 5 messages.
+hello_noargs=Hello
+greeting_missing=Hello, Alice! You have %!d(MISSING) messages.
+hello_extra=Hello%!(EXTRA string=extra)
+ratio=Ratio: 3.14
+flag=Enabled: true
+quoted=He said "hi"
+generic=42
+percent_noargs=100%% done
+percent=100% done%!(EXTRA string=x)
+missing_key=missing.key%!(EXTRA string=arg)
+### LOAD JSON
+load_error=false
+json_hello=Hola
+json_bye=Adios
+json_it_hello=Ciao
+json_it_bye=bye
+json_locale=es
+json_locale=it
+load_missing_error=true
+load_invalid_error=true
+load_bad_shape_error=true

@@ -4,8 +4,8 @@ use thiserror::Error;
 
 /// Erro padronizado utilizado pelas bibliotecas da suite.
 ///
-/// Cada crate pode estender este tipo com variantes proprias atraves de
-/// [`thiserror::Error::source`] ou simplesmente definir seu proprio enum de
+/// Cada crate pode estender este tipo com variantes proprias (via
+/// `#[from]` do thiserror) ou simplesmente definir seu proprio enum de
 /// erro; este tipo cobre os casos transversais (cor invalida, I/O).
 #[derive(Debug, Error)]
 pub enum Error {

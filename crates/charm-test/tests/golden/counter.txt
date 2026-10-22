@@ -1,0 +1,16 @@
+initial:
+Count: 0
+
+Press k/j to change, q to quit.
+increment:
+Count: 3
+
+Press k/j to change, q to quit.
+decrement:
+Count: 1
+
+Press k/j to change, q to quit.
+resized 40x10:
+Count: 1
+
+Press k/j to change, q to quit.

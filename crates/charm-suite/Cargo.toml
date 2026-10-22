@@ -1,0 +1,56 @@
+[package]
+name = "charm-suite"
+description = "Agregador da Charm Suite Rust: ecossistema de bibliotecas para TUIs no stack Charmbracelet."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["tui", "terminal", "charm", "suite", "lipgloss"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+charm-banner = { path = "../charm-banner", version = "0.1.0", optional = true }
+charm-charts = { path = "../charm-charts", version = "0.1.0", optional = true }
+charm-color = { path = "../charm-color", version = "0.1.0", optional = true }
+charm-devtools = { path = "../charm-devtools", version = "0.1.0", optional = true }
+charm-dialog = { path = "../charm-dialog", version = "0.1.0", optional = true }
+charm-diff = { path = "../charm-diff", version = "0.1.0", optional = true }
+charm-form = { path = "../charm-form", version = "0.1.0", optional = true }
+charm-i18n = { path = "../charm-i18n", version = "0.1.0", optional = true }
+charm-layout = { path = "../charm-layout", version = "0.1.0", optional = true }
+charm-nav = { path = "../charm-nav", version = "0.1.0", optional = true }
+charm-notify = { path = "../charm-notify", version = "0.1.0", optional = true }
+charm-palette = { path = "../charm-palette", version = "0.1.0", optional = true }
+charm-spinner = { path = "../charm-spinner", version = "0.1.0", optional = true }
+charm-test = { path = "../charm-test", version = "0.1.0", optional = true }
+charm-themes = { path = "../charm-themes", version = "0.1.0", optional = true }
+charm-toast = { path = "../charm-toast", version = "0.1.0", optional = true }
+charm-wizard = { path = "../charm-wizard", version = "0.1.0", optional = true }
+
+[features]
+default = ["full"]
+full = ["banner", "charts", "color", "devtools", "dialog", "diff", "form", "i18n", "layout", "nav", "notify", "palette", "spinner", "test", "themes", "toast", "wizard"]
+banner = ["dep:charm-banner"]
+charts = ["dep:charm-charts"]
+color = ["dep:charm-color"]
+devtools = ["dep:charm-devtools"]
+dialog = ["dep:charm-dialog"]
+diff = ["dep:charm-diff"]
+form = ["dep:charm-form"]
+i18n = ["dep:charm-i18n"]
+layout = ["dep:charm-layout"]
+nav = ["dep:charm-nav"]
+notify = ["dep:charm-notify"]
+palette = ["dep:charm-palette"]
+spinner = ["dep:charm-spinner"]
+test = ["dep:charm-test"]
+themes = ["dep:charm-themes"]
+toast = ["dep:charm-toast"]
+wizard = ["dep:charm-wizard"]
+
+[lints]
+workspace = true

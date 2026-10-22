@@ -1,0 +1,20 @@
+title: Deploy Configuration
+description: Configure deployment settings
+fields:
+  - name: environment
+    type: select
+    label: Target Environment
+    options: [staging, production, development]
+    required: true
+  - name: version
+    type: input
+    label: Version
+    placeholder: "v1.0.0"
+    validate: "^v\\d+\\.\\d+\\.\\d+$"
+  - name: dry_run
+    type: confirm
+    label: Dry run only?
+  - name: services
+    type: multiselect
+    label: Services to deploy
+    options: [api, web, worker, scheduler]

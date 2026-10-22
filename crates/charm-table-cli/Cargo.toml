@@ -1,0 +1,31 @@
+[package]
+name = "charm-table-cli"
+description = "CLI para renderizar CSV, JSON e TSV como tabelas estilizadas no terminal."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["cli", "table", "csv", "json", "terminal"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[[bin]]
+name = "charm-table"
+path = "src/main.rs"
+
+[dependencies]
+charm-core.workspace = true
+clap.workspace = true
+csv.workspace = true
+lipgloss.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
+thiserror.workspace = true
+
+[dev-dependencies]
+charm-parity.workspace = true
+
+[lints]
+workspace = true
