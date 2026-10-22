@@ -165,6 +165,13 @@ fn with_styles_replaces_styles() {
 
 #[test]
 fn default_styles_match_go_colors() {
+    // O `lipgloss` guarda o token de cor no momento em que o estilo e
+    // construido, e o token depende do perfil de cor detectado. Em
+    // ambientes sem TTY (CI) o perfil e `NoColor` e todos os tokens viram
+    // string vazia. Forcamos TrueColor para que a assercao seja
+    // independente do ambiente.
+    lipgloss::renderer::set_color_profile(lipgloss::renderer::ColorProfileKind::TrueColor);
+
     let s = Styles::default();
     let fg = |style: &lipgloss::Style| style.get_foreground().map(|c| c.0);
     let bg = |style: &lipgloss::Style| style.get_background().map(|c| c.0);

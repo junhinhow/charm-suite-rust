@@ -510,6 +510,10 @@ mod tests {
 
     #[test]
     fn style_is_applied_to_the_output() {
+        // Sem TTY (CI) o `lipgloss` detecta `NoColor` e remove todo o SGR.
+        // Forcamos truecolor para que a assercao seja independente do ambiente.
+        lipgloss::renderer::set_color_profile(lipgloss::renderer::ColorProfileKind::TrueColor);
+
         let style = lipgloss::Style::new().bold(true);
         let styled = render("A", &[RenderOption::Style(style.clone())]);
         let plain = render("A", &[]);

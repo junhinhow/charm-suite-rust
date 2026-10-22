@@ -60,6 +60,13 @@ const MATRIX: &[(&str, &[&str], &str)] = &[
 fn run_charm(args: &[&str], stdin: &str) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_charm-table"))
         .args(args)
+        // O perfil de cor e detectado pelo ambiente. Em CI nao ha TTY e o
+        // `lipgloss` cai para `NoColor`, o que removeria os codigos ANSI e
+        // tornaria as assercoes de cor dependentes da maquina. Forcamos
+        // truecolor para que os testes de cor sejam deterministicos.
+        .env("COLORTERM", "truecolor")
+        .env("TERM", "xterm-256color")
+        .env_remove("NO_COLOR")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
