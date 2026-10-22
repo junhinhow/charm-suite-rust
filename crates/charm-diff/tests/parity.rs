@@ -188,6 +188,7 @@ fn render_report() -> String {
         let opts = Options {
             context_lines: case.context_lines,
             style,
+            ..Options::default()
         };
 
         let _ = writeln!(out, "### CASE {}", case.name);

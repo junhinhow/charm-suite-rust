@@ -7,7 +7,7 @@
 use charm_core::{pad_or_truncate as core_pad_or_truncate, split_lines as core_split_lines};
 
 use crate::styles::DiffStyle;
-use crate::Options;
+use crate::{Algorithm, Options};
 
 /// The kind of a single diff operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -155,6 +155,364 @@ pub(crate) fn compute_diff(old_lines: &[&str], new_lines: &[&str]) -> Vec<DiffOp
     // It was built from the end, so reverse it.
     ops.reverse();
     ops
+}
+
+fn compute_selected_diff(
+    old_lines: &[&str],
+    new_lines: &[&str],
+    algorithm: Algorithm,
+) -> Vec<DiffOp> {
+    match algorithm {
+        Algorithm::Lcs => compute_diff(old_lines, new_lines),
+        Algorithm::Myers => compute_diff_myers(old_lines, new_lines),
+    }
+}
+
+/// Computes a shortest edit script using Myers' bidirectional middle-snake
+/// search. The frontier vectors are released before recursing, so auxiliary
+/// memory remains linear in the input size.
+pub(crate) fn compute_diff_myers(old_lines: &[&str], new_lines: &[&str]) -> Vec<DiffOp> {
+    let mut ops = Vec::with_capacity(old_lines.len().saturating_add(new_lines.len()));
+    compute_diff_myers_range(old_lines, new_lines, 0, 0, &mut ops);
+    ops
+}
+
+/// Reconstructs one range of a Myers diff, appending operations in source
+/// order and retaining absolute line indexes.
+fn compute_diff_myers_range(
+    old_lines: &[&str],
+    new_lines: &[&str],
+    old_offset: usize,
+    new_offset: usize,
+    ops: &mut Vec<DiffOp>,
+) {
+    let mut prefix_len = 0;
+    while prefix_len < old_lines.len().min(new_lines.len())
+        && old_lines[prefix_len] == new_lines[prefix_len]
+    {
+        ops.push(DiffOp {
+            kind: OpKind::Equal,
+            old_line: line_number(old_offset + prefix_len),
+            new_line: line_number(new_offset + prefix_len),
+            text: old_lines[prefix_len].to_owned(),
+        });
+        prefix_len += 1;
+    }
+
+    let old_middle = &old_lines[prefix_len..];
+    let new_middle = &new_lines[prefix_len..];
+    let mut suffix_len = 0;
+    while suffix_len < old_middle.len().min(new_middle.len())
+        && old_middle[old_middle.len() - suffix_len - 1]
+            == new_middle[new_middle.len() - suffix_len - 1]
+    {
+        suffix_len += 1;
+    }
+
+    let old_core = &old_middle[..old_middle.len() - suffix_len];
+    let new_core = &new_middle[..new_middle.len() - suffix_len];
+    let old_core_offset = old_offset + prefix_len;
+    let new_core_offset = new_offset + prefix_len;
+
+    match (old_core.len(), new_core.len()) {
+        (0, 0) => {}
+        (0, _) => push_inserts(new_core, new_core_offset, ops),
+        (_, 0) => push_deletes(old_core, old_core_offset, ops),
+        (1, _) => diff_single_old_line(old_core, new_core, old_core_offset, new_core_offset, ops),
+        (_, 1) => diff_single_new_line(old_core, new_core, old_core_offset, new_core_offset, ops),
+        _ => {
+            if let Some((old_split, new_split)) = find_middle_split(old_core, new_core) {
+                if (old_split, new_split) != (0, 0)
+                    && (old_split, new_split) != (old_core.len(), new_core.len())
+                {
+                    compute_diff_myers_range(
+                        &old_core[..old_split],
+                        &new_core[..new_split],
+                        old_core_offset,
+                        new_core_offset,
+                        ops,
+                    );
+                    compute_diff_myers_range(
+                        &old_core[old_split..],
+                        &new_core[new_split..],
+                        old_core_offset + old_split,
+                        new_core_offset + new_split,
+                        ops,
+                    );
+                } else {
+                    // A boundary-only overlap is resolved by an exact linear-
+                    // space LCS reconstruction rather than risking recursion
+                    // without progress.
+                    compute_diff_hirschberg(
+                        old_core,
+                        new_core,
+                        old_core_offset,
+                        new_core_offset,
+                        ops,
+                    );
+                }
+            } else {
+                compute_diff_hirschberg(old_core, new_core, old_core_offset, new_core_offset, ops);
+            }
+        }
+    }
+
+    for suffix_index in 0..suffix_len {
+        let old_index = old_lines.len() - suffix_len + suffix_index;
+        let new_index = new_lines.len() - suffix_len + suffix_index;
+        ops.push(DiffOp {
+            kind: OpKind::Equal,
+            old_line: line_number(old_offset + old_index),
+            new_line: line_number(new_offset + new_index),
+            text: old_lines[old_index].to_owned(),
+        });
+    }
+}
+
+fn push_inserts(lines: &[&str], offset: usize, ops: &mut Vec<DiffOp>) {
+    for (index, text) in lines.iter().enumerate() {
+        ops.push(DiffOp {
+            kind: OpKind::Insert,
+            old_line: -1,
+            new_line: line_number(offset + index),
+            text: (*text).to_owned(),
+        });
+    }
+}
+
+fn push_deletes(lines: &[&str], offset: usize, ops: &mut Vec<DiffOp>) {
+    for (index, text) in lines.iter().enumerate() {
+        ops.push(DiffOp {
+            kind: OpKind::Delete,
+            old_line: line_number(offset + index),
+            new_line: -1,
+            text: (*text).to_owned(),
+        });
+    }
+}
+
+fn diff_single_old_line(
+    old_lines: &[&str],
+    new_lines: &[&str],
+    old_offset: usize,
+    new_offset: usize,
+    ops: &mut Vec<DiffOp>,
+) {
+    if let Some(equal_index) = new_lines.iter().position(|line| *line == old_lines[0]) {
+        push_inserts(&new_lines[..equal_index], new_offset, ops);
+        ops.push(DiffOp {
+            kind: OpKind::Equal,
+            old_line: line_number(old_offset),
+            new_line: line_number(new_offset + equal_index),
+            text: old_lines[0].to_owned(),
+        });
+        push_inserts(
+            &new_lines[equal_index + 1..],
+            new_offset + equal_index + 1,
+            ops,
+        );
+    } else {
+        push_deletes(old_lines, old_offset, ops);
+        push_inserts(new_lines, new_offset, ops);
+    }
+}
+
+fn diff_single_new_line(
+    old_lines: &[&str],
+    new_lines: &[&str],
+    old_offset: usize,
+    new_offset: usize,
+    ops: &mut Vec<DiffOp>,
+) {
+    if let Some(equal_index) = old_lines.iter().position(|line| *line == new_lines[0]) {
+        push_deletes(&old_lines[..equal_index], old_offset, ops);
+        ops.push(DiffOp {
+            kind: OpKind::Equal,
+            old_line: line_number(old_offset + equal_index),
+            new_line: line_number(new_offset),
+            text: new_lines[0].to_owned(),
+        });
+        push_deletes(
+            &old_lines[equal_index + 1..],
+            old_offset + equal_index + 1,
+            ops,
+        );
+    } else {
+        push_deletes(old_lines, old_offset, ops);
+        push_inserts(new_lines, new_offset, ops);
+    }
+}
+
+/// Finds an overlap of the forward and reverse Myers frontiers.
+fn find_middle_split(old_lines: &[&str], new_lines: &[&str]) -> Option<(usize, usize)> {
+    let old_len = isize::try_from(old_lines.len()).ok()?;
+    let new_len = isize::try_from(new_lines.len()).ok()?;
+    let max_distance = (old_len + new_len + 1) / 2;
+    let offset = max_distance;
+    let vector_len = usize::try_from(2 * max_distance + 3).ok()?;
+    let vector_offset = usize::try_from(offset + 1).ok()?;
+    let mut forward = vec![-1isize; vector_len];
+    let mut reverse = vec![-1isize; vector_len];
+    forward[vector_offset + 1] = 0;
+    reverse[vector_offset + 1] = 0;
+    let delta = old_len - new_len;
+    let odd_delta = delta % 2 != 0;
+
+    for distance in 0..=max_distance {
+        let mut diagonal = -distance;
+        while diagonal <= distance {
+            let index = usize::try_from(offset + diagonal + 1).ok()?;
+            let mut x = if diagonal == -distance
+                || (diagonal != distance && forward[index - 1] < forward[index + 1])
+            {
+                forward[index + 1]
+            } else {
+                forward[index - 1] + 1
+            };
+            let mut y = x - diagonal;
+            while x < old_len
+                && y < new_len
+                && old_lines[usize::try_from(x).ok()?] == new_lines[usize::try_from(y).ok()?]
+            {
+                x += 1;
+                y += 1;
+            }
+            forward[index] = x;
+
+            if odd_delta {
+                let reverse_diagonal = delta - diagonal;
+                let reverse_index = offset + reverse_diagonal + 1;
+                if reverse_index >= 0
+                    && usize::try_from(reverse_index).ok()? < reverse.len()
+                    && reverse[usize::try_from(reverse_index).ok()?] != -1
+                {
+                    let reverse_x = old_len - reverse[usize::try_from(reverse_index).ok()?];
+                    if x >= reverse_x {
+                        return Some((usize::try_from(x).ok()?, usize::try_from(y).ok()?));
+                    }
+                }
+            }
+            diagonal += 2;
+        }
+
+        let mut diagonal = -distance;
+        while diagonal <= distance {
+            let index = usize::try_from(offset + diagonal + 1).ok()?;
+            let mut x = if diagonal == -distance
+                || (diagonal != distance && reverse[index - 1] < reverse[index + 1])
+            {
+                reverse[index + 1]
+            } else {
+                reverse[index - 1] + 1
+            };
+            let mut y = x - diagonal;
+            while x < old_len
+                && y < new_len
+                && old_lines[usize::try_from(old_len - x - 1).ok()?]
+                    == new_lines[usize::try_from(new_len - y - 1).ok()?]
+            {
+                x += 1;
+                y += 1;
+            }
+            reverse[index] = x;
+
+            if !odd_delta {
+                let forward_diagonal = delta - diagonal;
+                let forward_index = offset + forward_diagonal + 1;
+                if forward_index >= 0
+                    && usize::try_from(forward_index).ok()? < forward.len()
+                    && forward[usize::try_from(forward_index).ok()?] != -1
+                {
+                    let forward_x = forward[usize::try_from(forward_index).ok()?];
+                    let reverse_x = old_len - x;
+                    if forward_x >= reverse_x {
+                        let split_x = usize::try_from(forward_x).ok()?;
+                        let split_y = usize::try_from(forward_x - forward_diagonal).ok()?;
+                        return Some((split_x, split_y));
+                    }
+                }
+            }
+            diagonal += 2;
+        }
+    }
+
+    None
+}
+
+/// Linear-space LCS fallback for a degenerate middle-snake split. It computes
+/// the midpoint from forward and reverse score rows, then reconstructs both
+/// halves recursively.
+fn compute_diff_hirschberg(
+    old_lines: &[&str],
+    new_lines: &[&str],
+    old_offset: usize,
+    new_offset: usize,
+    ops: &mut Vec<DiffOp>,
+) {
+    if old_lines.is_empty() {
+        push_inserts(new_lines, new_offset, ops);
+        return;
+    }
+    if new_lines.is_empty() {
+        push_deletes(old_lines, old_offset, ops);
+        return;
+    }
+    if old_lines.len() == 1 {
+        diff_single_old_line(old_lines, new_lines, old_offset, new_offset, ops);
+        return;
+    }
+    if new_lines.len() == 1 {
+        diff_single_new_line(old_lines, new_lines, old_offset, new_offset, ops);
+        return;
+    }
+
+    let old_mid = old_lines.len() / 2;
+    let forward = lcs_score_row(&old_lines[..old_mid], new_lines);
+    let reversed_old = old_lines[old_mid..]
+        .iter()
+        .rev()
+        .copied()
+        .collect::<Vec<_>>();
+    let reversed_new = new_lines.iter().rev().copied().collect::<Vec<_>>();
+    let reverse = lcs_score_row(&reversed_old, &reversed_new);
+    let split = (0..=new_lines.len())
+        .max_by_key(|&index| forward[index] + reverse[new_lines.len() - index])
+        .unwrap_or(0);
+    drop(forward);
+    drop(reverse);
+    drop(reversed_old);
+    drop(reversed_new);
+    compute_diff_hirschberg(
+        &old_lines[..old_mid],
+        &new_lines[..split],
+        old_offset,
+        new_offset,
+        ops,
+    );
+    compute_diff_hirschberg(
+        &old_lines[old_mid..],
+        &new_lines[split..],
+        old_offset + old_mid,
+        new_offset + split,
+        ops,
+    );
+}
+
+fn lcs_score_row(old_lines: &[&str], new_lines: &[&str]) -> Vec<usize> {
+    let mut scores = vec![0; new_lines.len() + 1];
+    for old_line in old_lines {
+        let mut diagonal = 0;
+        for (index, new_line) in new_lines.iter().enumerate() {
+            let previous = scores[index + 1];
+            scores[index + 1] = if *old_line == *new_line {
+                diagonal + 1
+            } else {
+                scores[index + 1].max(scores[index])
+            };
+            diagonal = previous;
+        }
+    }
+    scores
 }
 
 /// Groups the operations into hunks, keeping `context_lines` lines of context
@@ -356,7 +714,7 @@ fn format_line_numbers(op: &DiffOp, style: &DiffStyle) -> String {
 pub(crate) fn unified_diff(old: &str, new: &str, opts: &Options) -> String {
     let old_lines = split_lines(old);
     let new_lines = split_lines(new);
-    let ops = compute_diff(&old_lines, &new_lines);
+    let ops = compute_selected_diff(&old_lines, &new_lines, opts.algorithm);
     let hunks = build_hunks(&ops, opts.context_lines);
 
     if hunks.is_empty() {
@@ -407,7 +765,7 @@ pub(crate) fn unified_diff(old: &str, new: &str, opts: &Options) -> String {
 pub(crate) fn side_by_side_diff(old: &str, new: &str, width: usize, opts: &Options) -> String {
     let old_lines = split_lines(old);
     let new_lines = split_lines(new);
-    let ops = compute_diff(&old_lines, &new_lines);
+    let ops = compute_selected_diff(&old_lines, &new_lines, opts.algorithm);
 
     if ops.is_empty() {
         return String::new();
@@ -651,5 +1009,162 @@ mod tests {
         let rendered = format_line_numbers(&op, &style);
         let plain = charm_core::strip_ansi(&rendered);
         assert_eq!(plain, "        5 ");
+    }
+
+    #[test]
+    fn myers_identical_inputs_are_all_equal() {
+        let ops = compute_diff_myers(&["alpha", "beta"], &["alpha", "beta"]);
+        assert_eq!(ops.len(), 2);
+        assert!(ops.iter().all(|op| op.kind == OpKind::Equal));
+    }
+
+    #[test]
+    fn myers_handles_insert_delete_and_modification() {
+        let old = ["before", "removed", "changed", "after"];
+        let new = ["before", "inserted", "changed!", "after"];
+        let ops = compute_diff_myers(&old, &new);
+        assert!(ops.iter().any(|op| op.kind == OpKind::Insert));
+        assert!(ops.iter().any(|op| op.kind == OpKind::Delete));
+        assert_eq!(apply_ops(&old, &new, &ops), new);
+    }
+
+    #[test]
+    fn myers_handles_empty_disjoint_and_repeated_inputs() {
+        for (old, new) in [
+            (&[][..], &[][..]),
+            (&[][..], &["a"][..]),
+            (&["a"][..], &[][..]),
+            (&["a", "b"][..], &["x", "y"][..]),
+            (&["x", "a", "x", "a", "x"][..], &["a", "x", "a"][..]),
+        ] {
+            let ops = compute_diff_myers(old, new);
+            assert_eq!(apply_ops(old, new, &ops), new);
+        }
+    }
+
+    #[test]
+    fn myers_matches_go_example_with_minimal_edits() {
+        // Go's TestSideBySideDiff_Basic example: the exact tie order can differ
+        // from LCS for ambiguous repeated lines, but both scripts stay minimal.
+        let old = ["hello", "world"];
+        let new = ["hello", "earth"];
+        let lcs = compute_diff(&old, &new);
+        let myers = compute_diff_myers(&old, &new);
+        assert_eq!(apply_ops(&old, &new, &myers), new);
+        assert_eq!(edit_count(&myers), edit_count(&lcs));
+
+        let ambiguous_old = ["a", "b"];
+        let ambiguous_new = ["b", "a"];
+        let lcs = compute_diff(&ambiguous_old, &ambiguous_new);
+        let myers = compute_diff_myers(&ambiguous_old, &ambiguous_new);
+        assert_eq!(edit_count(&myers), edit_count(&lcs));
+        assert_eq!(
+            apply_ops(&ambiguous_old, &ambiguous_new, &myers),
+            ambiguous_new
+        );
+    }
+
+    #[test]
+    fn myers_handles_ten_thousand_lines_with_one_change() {
+        let old = (0..10_000)
+            .map(|line| format!("line {line}"))
+            .collect::<Vec<_>>();
+        let mut new = old.clone();
+        new[5_000] = "changed line".to_owned();
+        let old_refs = old.iter().map(String::as_str).collect::<Vec<_>>();
+        let new_refs = new.iter().map(String::as_str).collect::<Vec<_>>();
+
+        let start = std::time::Instant::now();
+        let ops = compute_diff_myers(&old_refs, &new_refs);
+        let elapsed = start.elapsed();
+
+        assert_eq!(ops.len(), 10_001);
+        assert!(
+            elapsed < std::time::Duration::from_secs(2),
+            "took {elapsed:?}"
+        );
+        assert_eq!(apply_ops(&old_refs, &new_refs, &ops), new_refs);
+    }
+
+    #[test]
+    fn myers_property_random_sequences_are_valid_and_minimal() {
+        let alphabet = ["a", "b", "c", "d"];
+        let mut random = Xorshift64(0x9e37_79b9_7f4a_7c15);
+
+        for _ in 0..1_000 {
+            let old_len = (random.next() % 16) as usize;
+            let new_len = (random.next() % 16) as usize;
+            let old = (0..old_len)
+                .map(|_| alphabet[(random.next() % alphabet.len() as u64) as usize])
+                .collect::<Vec<_>>();
+            let new = (0..new_len)
+                .map(|_| alphabet[(random.next() % alphabet.len() as u64) as usize])
+                .collect::<Vec<_>>();
+
+            let myers = compute_diff_myers(&old, &new);
+            let lcs = compute_diff(&old, &new);
+            assert_eq!(apply_ops(&old, &new, &myers), new);
+            assert!(
+                edit_count(&myers) <= edit_count(&lcs),
+                "old={old:?}, new={new:?}"
+            );
+        }
+    }
+
+    fn edit_count(ops: &[DiffOp]) -> usize {
+        ops.iter().filter(|op| op.kind != OpKind::Equal).count()
+    }
+
+    fn apply_ops<'a>(old: &[&'a str], new: &[&'a str], ops: &[DiffOp]) -> Vec<&'a str> {
+        let mut old_index = 0;
+        let mut new_index = 0;
+        let mut output = Vec::new();
+        let mut old_equal_lines = Vec::new();
+        let mut new_equal_lines = Vec::new();
+
+        for op in ops {
+            match op.kind {
+                OpKind::Equal => {
+                    assert_eq!(old.get(old_index), Some(&op.text.as_str()));
+                    assert_eq!(new.get(new_index), Some(&op.text.as_str()));
+                    assert_eq!(op.old_line, line_number(old_index));
+                    assert_eq!(op.new_line, line_number(new_index));
+                    output.push(old[old_index]);
+                    old_equal_lines.push(old[old_index]);
+                    new_equal_lines.push(new[new_index]);
+                    old_index += 1;
+                    new_index += 1;
+                }
+                OpKind::Delete => {
+                    assert_eq!(old.get(old_index), Some(&op.text.as_str()));
+                    assert_eq!(op.old_line, line_number(old_index));
+                    assert_eq!(op.new_line, -1);
+                    old_index += 1;
+                }
+                OpKind::Insert => {
+                    assert_eq!(new.get(new_index), Some(&op.text.as_str()));
+                    assert_eq!(op.old_line, -1);
+                    assert_eq!(op.new_line, line_number(new_index));
+                    output.push(new[new_index]);
+                    new_index += 1;
+                }
+            }
+        }
+
+        assert_eq!(old_index, old.len());
+        assert_eq!(new_index, new.len());
+        assert_eq!(old_equal_lines, new_equal_lines);
+        output
+    }
+
+    struct Xorshift64(u64);
+
+    impl Xorshift64 {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
     }
 }

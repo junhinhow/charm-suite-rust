@@ -1,0 +1,29 @@
+# Configuração do cargo-release (https://github.com/crate-ci/cargo-release).
+#
+# Uso (dry-run por padrão):  cargo release minor
+# Executar de verdade:       cargo release minor --execute
+#
+# A publicação no crates.io NÃO é feita pelo cargo-release (publish = false).
+# Use scripts/release.sh (ou scripts/release.ps1), que respeita a ordem de
+# dependência entre os crates. Ver CONTRIBUTING.md.
+
+# Todos os crates compartilham a mesma versão (version.workspace = true).
+shared-version = true
+
+# Um único commit de release, em vez de um por crate.
+consolidate-commits = true
+
+# Tag só com a versão, ex.: 0.1.0.
+tag-prefix = ""
+
+# Publicação manual, na ordem de dependência (scripts/release.sh).
+publish = false
+
+# Não envia commits nem tags ao remoto automaticamente.
+push = false
+
+[[pre-release-replacements]]
+file = "CHANGELOG.md"
+search = "## \\[Unreleased\\]"
+replace = "## [Unreleased]\n\n## [{{version}}] - {{date}}"
+exactly = 1

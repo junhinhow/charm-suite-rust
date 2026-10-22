@@ -4,7 +4,7 @@ Beautiful terminal diff viewer for the [Charm](https://charm.sh) ecosystem. Prod
 
 > **[Read in Portuguese](README.pt-br.md)**
 
-This is a Rust port of the Go library [`github.com/junhinhow/charm-diff`](https://github.com/junhinhow/charm-diff). The output is byte-for-byte identical to the original (ANSI codes aside), which is verified by golden files generated from the Go implementation.
+This is a Rust port of the Go library [`github.com/junhinhow/charm-diff`](https://github.com/junhinhow/charm-diff). The default LCS output is byte-for-byte identical to the original (ANSI codes aside), which is verified by golden files generated from the Go implementation.
 
 ## Features
 
@@ -52,12 +52,13 @@ fn main() {
 ### Custom Options
 
 ```rust
-use charm_diff::{unified_diff_with_options, DiffStyle, Options};
+use charm_diff::{unified_diff_with_options, Algorithm, DiffStyle, Options};
 
 fn main() {
     let opts = Options {
         context_lines: 5,
         style: DiffStyle::github(),
+        algorithm: Algorithm::Myers,
     };
 
     print!("{}", unified_diff_with_options("a\nb\n", "a\nc\n", &opts));
@@ -85,7 +86,8 @@ cargo run -p charm-diff --example demo
 
 | Type | Description |
 |------|-------------|
-| `Options` | Configuration: `context_lines: usize`, `style: DiffStyle` |
+| `Options` | Configuration: `context_lines: usize`, `style: DiffStyle`, `algorithm: Algorithm` |
+| `Algorithm` | `Lcs` (default, Go parity) or `Myers` (linear auxiliary memory) |
 | `DiffStyle` | Lip Gloss styles for each diff element |
 
 ### Style Constructors
@@ -108,30 +110,27 @@ cargo run -p charm-diff --example demo
 | `DefaultStyle()` | `DiffStyle::default()` |
 | `TerminalStyle()` | `DiffStyle::terminal()` |
 | `GitHubStyle()` | `DiffStyle::github()` |
-| `Options{ContextLines: n, Style: s}` | `Options { context_lines: n, style: s }` |
+| `Options{ContextLines: n, Style: s}` | `Options { context_lines: n, style: s, algorithm: Algorithm::Lcs }` |
 
-## Algorithm
+## Algorithms
 
-The diff is computed with the classic dynamic-programming
-**longest common subsequence** (LCS) algorithm:
+`Options` selects the diff algorithm with its `algorithm` field:
 
-1. The full `(old_len + 1) x (new_len + 1)` table is filled with the length of
-   the longest common subsequence of every pair of prefixes.
-2. The table is walked backwards to rebuild the list of operations
-   (`Equal`, `Insert`, `Delete`).
-3. The list is reversed, because it was built from the end.
-4. Operations are grouped into *hunks* keeping `context_lines` lines of
-   context around every change; overlapping hunks are merged.
-5. The side-by-side layout pairs a deletion followed by an insertion into a
-   single "modified line".
+- **`Algorithm::Lcs` (default):** uses the classic dynamic-programming LCS
+  table, with `O(n · m)` memory. Its tie-breaking matches the original Go
+  implementation exactly, preserving byte-for-byte parity.
+- **`Algorithm::Myers`:** uses Myers' bidirectional middle-snake divide-and-
+  conquer algorithm with `O(n + m)` auxiliary memory. It produces a shortest
+  edit script and is recommended for large files.
 
-The tie-breaking rules of the reconstruction are identical to the Go original,
-so the **order of the operations** — and therefore the rendered output — is the
-same.
+Both algorithms emit operations from the start of the input to the end. When
+multiple shortest diffs are possible (for example, with repeated lines), Myers
+may choose a different valid ordering of insertions and deletions than LCS;
+therefore its rendered output can differ from the Go golden while still
+transforming the old text into the new text with the minimum number of edits.
 
-> **Note on complexity:** the LCS table uses `O(n · m)` memory, exactly like the
-> Go original. This is kept on purpose to guarantee bit-for-bit parity; an
-> optimised (linear-space) variant is a possible post-1.0 improvement.
+Operations are then grouped into *hunks* using `context_lines`; the side-by-side
+layout pairs a deletion followed by an insertion into a single "modified line".
 
 ## Known differences
 

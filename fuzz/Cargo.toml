@@ -1,0 +1,39 @@
+[package]
+name = "charm-suite-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1", features = ["derive"] }
+libfuzzer-sys = "0.4"
+serde_json = "1"
+charm-banner = { path = "../crates/charm-banner" }
+charm-diff = { path = "../crates/charm-diff" }
+charm-i18n = { path = "../crates/charm-i18n" }
+
+[[bin]]
+name = "diff"
+path = "fuzz_targets/diff.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "i18n_format"
+path = "fuzz_targets/i18n_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "banner"
+path = "fuzz_targets/banner.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

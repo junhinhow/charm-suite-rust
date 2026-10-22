@@ -7,7 +7,8 @@
 //! The diff itself is computed with a dynamic-programming
 //! [longest common subsequence](https://en.wikipedia.org/wiki/Longest_common_subsequence)
 //! (LCS) algorithm, exactly like the Go original, so the produced output is
-//! byte-for-byte identical to `github.com/junhinhow/charm-diff`.
+//! byte-for-byte identical to `github.com/junhinhow/charm-diff` by default. A
+//! linear-space Myers algorithm is also available for large inputs.
 //!
 //! # Examples
 //!
@@ -27,11 +28,12 @@
 //! Side-by-side diff with a custom width and style:
 //!
 //! ```
-//! use charm_diff::{side_by_side_diff_with_options, DiffStyle, Options};
+//! use charm_diff::{side_by_side_diff_with_options, Algorithm, DiffStyle, Options};
 //!
 //! let opts = Options {
 //!     context_lines: 5,
 //!     style: DiffStyle::github(),
+//!     algorithm: Algorithm::Lcs,
 //! };
 //!
 //! let diff = side_by_side_diff_with_options("hello\nworld\n", "hello\nearth\n", 80, &opts);
@@ -47,15 +49,40 @@ mod styles;
 
 pub use styles::DiffStyle;
 
-/// Configuration used when rendering a diff.
+/// Algorithm used to compute the diff operations.
 ///
 /// # Examples
 ///
 /// ```
-/// use charm_diff::Options;
+/// use charm_diff::{Algorithm, Options};
+///
+/// let options = Options { algorithm: Algorithm::Myers, ..Options::default() };
+/// assert_eq!(options.algorithm, Algorithm::Myers);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Algorithm {
+    /// Full LCS table. This is the default and matches the original Go output.
+    #[default]
+    Lcs,
+    /// Myers' shortest-edit-script algorithm using linear auxiliary space.
+    Myers,
+}
+
+/// Configuration used when rendering a diff.
+///
+/// The default algorithm is [`Algorithm::Lcs`], preserving byte-for-byte
+/// parity with the Go implementation. [`Algorithm::Myers`] uses linear
+/// auxiliary memory and may choose a different valid operation order when
+/// multiple shortest diffs are possible.
+///
+/// # Examples
+///
+/// ```
+/// use charm_diff::{Algorithm, Options};
 ///
 /// let opts = Options::default();
 /// assert_eq!(opts.context_lines, 3);
+/// assert_eq!(opts.algorithm, Algorithm::Lcs);
 /// ```
 #[derive(Clone, Debug)]
 pub struct Options {
@@ -63,6 +90,8 @@ pub struct Options {
     pub context_lines: usize,
     /// Visual style used while rendering.
     pub style: DiffStyle,
+    /// Algorithm used to compute the diff (default: [`Algorithm::Lcs`]).
+    pub algorithm: Algorithm,
 }
 
 impl Default for Options {
@@ -70,6 +99,7 @@ impl Default for Options {
         Self {
             context_lines: 3,
             style: DiffStyle::default(),
+            algorithm: Algorithm::default(),
         }
     }
 }
@@ -125,11 +155,12 @@ pub fn side_by_side_diff(old: &str, new: &str, width: usize) -> String {
 /// # Examples
 ///
 /// ```
-/// use charm_diff::{side_by_side_diff_with_options, DiffStyle, Options};
+/// use charm_diff::{side_by_side_diff_with_options, Algorithm, DiffStyle, Options};
 ///
 /// let opts = Options {
 ///     context_lines: 3,
 ///     style: DiffStyle::terminal(),
+///     algorithm: Algorithm::Lcs,
 /// };
 /// let diff = side_by_side_diff_with_options("a\n", "b\n", 40, &opts);
 /// assert!(diff.contains('|'));

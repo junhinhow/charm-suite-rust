@@ -16,6 +16,14 @@ readme = "README.md"
 charmed-bubbletea.workspace = true
 charm-core.workspace = true
 lipgloss.workspace = true
+charm-devtools-macros = { path = "../charm-devtools-macros", version = "0.1.0", optional = true }
+
+[features]
+derive = ["dep:charm-devtools-macros"]
+
+[[example]]
+name = "charm_devtools_derive_demo"
+required-features = ["derive"]
 
 [dev-dependencies]
 charm-parity = { path = "../../tools/parity" }

@@ -5,7 +5,7 @@ members = ["crates/*", "tools/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.88"
 license = "MIT"
 repository = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust"
 homepage = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust"
@@ -35,10 +35,15 @@ csv = "1"
 # --- erros ---
 thiserror = "2"
 anyhow = "1"
+# --- macros ---
+proc-macro2 = "1"
+quote = "1"
+syn = "2"
 # --- testes ---
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
 serial_test = "4"
+criterion = "0.5"
 # --- interno ---
 charm-core = { path = "crates/charm-core", version = "0.1.0" }
 charm-parity = { path = "tools/parity", version = "0.1.0" }

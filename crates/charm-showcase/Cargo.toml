@@ -1,0 +1,33 @@
+[package]
+name = "charm-showcase"
+description = "Unified deterministic demo of the Charm Suite Rust libraries."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+publish = false
+readme = "README.md"
+
+[dependencies]
+charm-banner = { path = "../charm-banner", version = "0.1.0" }
+charm-charts = { path = "../charm-charts", version = "0.1.0" }
+charm-color = { path = "../charm-color", version = "0.1.0" }
+charm-core.workspace = true
+charm-dialog = { path = "../charm-dialog", version = "0.1.0" }
+charm-diff = { path = "../charm-diff", version = "0.1.0" }
+charm-form = { path = "../charm-form", version = "0.1.0" }
+charm-i18n = { path = "../charm-i18n", version = "0.1.0" }
+charm-layout = { path = "../charm-layout", version = "0.1.0" }
+charm-nav = { path = "../charm-nav", version = "0.1.0" }
+charm-palette = { path = "../charm-palette", version = "0.1.0" }
+charm-spinner = { path = "../charm-spinner", version = "0.1.0" }
+charm-themes = { path = "../charm-themes", version = "0.1.0" }
+charm-toast = { path = "../charm-toast", version = "0.1.0" }
+charm-wizard = { path = "../charm-wizard", version = "0.1.0" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,10 @@
+title: Theme setup
+description: Choose a theme for the sample terminal application.
+fields:
+  - name: theme
+    type: select
+    label: Theme
+    options:
+      - dracula
+      - nord
+    required: true

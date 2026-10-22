@@ -299,6 +299,11 @@ fn rgb_to_hsl(color: Rgb) -> (f64, f64, f64) {
 
     let max = red.max(green.max(blue));
     let min = red.min(green.min(blue));
+    // Mantido como `(max + min) / 2.0` (e nao `f64::midpoint`) porque o
+    // `midpoint` evita overflow por outro caminho de calculo e pode divergir
+    // no ultimo bit — o que quebraria a paridade byte-a-byte com o Go, que
+    // usa exatamente `(max + min) / 2`.
+    #[allow(clippy::manual_midpoint)]
     let lightness = (max + min) / 2.0;
 
     if max == min {

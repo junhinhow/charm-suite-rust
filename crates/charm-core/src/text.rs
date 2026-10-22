@@ -91,7 +91,7 @@ pub fn pad_or_truncate(s: &str, width: usize) -> String {
     } else {
         let mut out = String::with_capacity(width);
         out.push_str(s);
-        out.extend(std::iter::repeat(' ').take(width - bytes.len()));
+        out.extend(std::iter::repeat_n(' ', width - bytes.len()));
         out
     }
 }

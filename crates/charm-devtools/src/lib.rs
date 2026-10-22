@@ -22,6 +22,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+extern crate self as charm_devtools;
+
+#[cfg(feature = "derive")]
+pub use charm_devtools_macros::DevInspect;
+
 mod inspector;
 
 use std::any::type_name;

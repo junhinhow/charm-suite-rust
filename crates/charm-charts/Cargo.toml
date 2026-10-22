@@ -18,6 +18,11 @@ lipgloss.workspace = true
 
 [dev-dependencies]
 charm-parity = { path = "../../tools/parity" }
+criterion.workspace = true
+
+[[bench]]
+name = "charts"
+harness = false
 
 [lints]
 workspace = true

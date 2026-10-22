@@ -25,3 +25,40 @@ The history keeps the latest 100 messages. Every message, including inspector na
 ## Breaking change from Go
 
 Go uses reflection to discover nested models automatically. Rust has no equivalent runtime reflection, so models must implement `DevInspect` to provide a component tree; the default implementation only reports the root type. This is a deliberate API breaking change. Also, Bubble Tea's type-erased `Message` does not expose concrete payload type names or values, so entries use the erased message type and its public `Debug` representation.
+
+## Derive macro
+
+Enable `charm-devtools`'s optional `derive` feature to use `#[derive(DevInspect)]`.
+The derive macro and the `DevInspect` trait intentionally share a name; Rust
+resolves them in separate macro and type namespaces, so they can be imported
+together. Named fields are ignored by default. Mark fields with `#[inspect]`
+or `#[devtools(inspect)]`; `Vec<T>` fields create one child per element with
+names such as `actions[0]`. Use `#[inspect(skip)]` to explicitly omit a field.
+Tuple and unit structs produce only a root node.
+
+```rust
+use charm_devtools::{ComponentNode, DevInspect};
+
+struct Button;
+impl DevInspect for Button {}
+
+#[derive(DevInspect)]
+struct Toolbar {
+    #[inspect]
+    save: Button,
+    #[devtools(inspect)]
+    actions: Vec<Button>,
+    #[inspect(skip)]
+    cache: Button,
+}
+
+let tree: ComponentNode = Toolbar {
+    save: Button,
+    actions: vec![Button],
+    cache: Button,
+}.inspect();
+assert_eq!(tree.children[0].name, "save");
+assert_eq!(tree.children[1].name, "actions[0]");
+```
+
+See `examples/charm_devtools_derive_demo.rs` for a runnable example.

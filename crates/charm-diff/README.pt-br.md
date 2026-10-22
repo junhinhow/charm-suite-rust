@@ -4,7 +4,7 @@ Visualizador de diffs no terminal para o ecossistema [Charm](https://charm.sh). 
 
 > **[Read in English](README.md)**
 
-Esta e uma portacao para Rust da biblioteca Go [`github.com/junhinhow/charm-diff`](https://github.com/junhinhow/charm-diff). A saida e byte a byte identica a original (desconsiderando os codigos ANSI), o que e verificado por *golden files* gerados a partir da implementacao Go.
+Esta e uma portacao para Rust da biblioteca Go [`github.com/junhinhow/charm-diff`](https://github.com/junhinhow/charm-diff). A saida padrao LCS e byte a byte identica a original (desconsiderando os codigos ANSI), o que e verificado por *golden files* gerados a partir da implementacao Go.
 
 ## Funcionalidades
 
@@ -52,12 +52,13 @@ fn main() {
 ### Opcoes Personalizadas
 
 ```rust
-use charm_diff::{unified_diff_with_options, DiffStyle, Options};
+use charm_diff::{unified_diff_with_options, Algorithm, DiffStyle, Options};
 
 fn main() {
     let opts = Options {
         context_lines: 5,
         style: DiffStyle::github(),
+        algorithm: Algorithm::Myers,
     };
 
     print!("{}", unified_diff_with_options("a\nb\n", "a\nc\n", &opts));
@@ -85,7 +86,8 @@ cargo run -p charm-diff --example demo
 
 | Tipo | Descricao |
 |------|-----------|
-| `Options` | Configuracao: `context_lines: usize`, `style: DiffStyle` |
+| `Options` | Configuracao: `context_lines: usize`, `style: DiffStyle`, `algorithm: Algorithm` |
+| `Algorithm` | `Lcs` (padrao, paridade Go) ou `Myers` (memoria auxiliar linear) |
 | `DiffStyle` | Estilos Lip Gloss para cada elemento do diff |
 
 ### Construtores de Estilo
@@ -108,31 +110,28 @@ cargo run -p charm-diff --example demo
 | `DefaultStyle()` | `DiffStyle::default()` |
 | `TerminalStyle()` | `DiffStyle::terminal()` |
 | `GitHubStyle()` | `DiffStyle::github()` |
-| `Options{ContextLines: n, Style: s}` | `Options { context_lines: n, style: s }` |
+| `Options{ContextLines: n, Style: s}` | `Options { context_lines: n, style: s, algorithm: Algorithm::Lcs }` |
 
-## Algoritmo
+## Algoritmos
 
-O diff e calculado com o classico algoritmo de programacao dinamica de
-**sequencia comum mais longa** (LCS):
+`Options` seleciona o algoritmo de diff pelo campo `algorithm`:
 
-1. A tabela completa `(old_len + 1) x (new_len + 1)` e preenchida com o
-   tamanho da maior subsequencia comum de cada par de prefixos.
-2. A tabela e percorrida de tras para frente para reconstruir a lista de
-   operacoes (`Equal`, `Insert`, `Delete`).
-3. A lista e invertida, porque foi construida de tras para frente.
-4. As operacoes sao agrupadas em *hunks* mantendo `context_lines` linhas de
-   contexto ao redor de cada mudanca; hunks sobrepostos sao mesclados.
-5. O layout lado a lado agrupa uma remocao seguida de uma insercao em uma
-   unica "linha modificada".
+- **`Algorithm::Lcs` (padrao):** usa a tabela classica de LCS por programacao
+  dinamica, com memoria `O(n · m)`. O desempate corresponde exatamente ao
+  original Go e preserva a paridade byte a byte.
+- **`Algorithm::Myers`:** usa o algoritmo divide-and-conquer bidirecional de
+  middle-snake do Myers, com memoria auxiliar `O(n + m)`. Produz uma sequencia
+  minima de edicoes e e indicado para arquivos grandes.
 
-As regras de desempate da reconstrucao sao identicas as do original Go, de
-modo que a **ordem das operacoes** — e portanto a saida renderizada — e a
-mesma.
+Os dois algoritmos emitem operacoes do inicio ao fim. Quando ha mais de um diff
+minimo possivel (por exemplo, com linhas repetidas), Myers pode escolher uma
+ordem valida diferente de insercoes e remocoes em relacao ao LCS; por isso, a
+saida renderizada pode diferir do golden Go, embora transforme o texto antigo
+no novo com o numero minimo de edicoes.
 
-> **Nota sobre complexidade:** a tabela LCS usa `O(n · m)` de memoria,
-> exatamente como o original Go. Isso e mantido de proposito para garantir a
-> paridade bit a bit; uma variante otimizada (espaco linear) e uma melhoria
-> possivel para depois da 1.0.
+As operacoes sao entao agrupadas em *hunks* conforme `context_lines`; o layout
+lado a lado combina uma remocao seguida de uma insercao em uma unica "linha
+modificada".
 
 ## Diferencas conhecidas
 

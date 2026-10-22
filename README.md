@@ -1,6 +1,9 @@
 # CharmSuite-Rust
 
-[![CI](https://img.shields.io/badge/CI-passing-16A34A?style=for-the-badge)](#) [![License: MIT](https://img.shields.io/badge/License-MIT-15803D?style=for-the-badge)](LICENSE) [![Rust 1.80+](https://img.shields.io/badge/Rust-1.80+-00ADD8?style=for-the-badge&logo=rust&logoColor=white)](#)
+<!-- MSRV: 1.88 (workspace.package.rust-version). Atualize este badge se a MSRV mudar. -->
+[![CI](https://github.com/junhinhow/charm-suite-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/junhinhow/charm-suite-rust/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-15803D?style=for-the-badge)](LICENSE) [![Rust 1.88+](https://img.shields.io/badge/Rust-1.88+-00ADD8?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+<!-- docs.rs: o badge só mostra documentação depois que o crate for publicado no crates.io. -->
+[![docs.rs](https://img.shields.io/docsrs/charm-suite?style=for-the-badge)](https://docs.rs/charm-suite)
 
 **PT:** Um ecossistema curado de bibliotecas Rust para o stack **Charmbracelet / Bubble Tea**. Cada `charm-*` resolve uma lacuna especifica que falta no conjunto oficial.
 **EN:** A curated ecosystem of Rust libraries for the **Charmbracelet / Bubble Tea** stack. Each `charm-*` fills a specific gap missing from the official set.
@@ -58,6 +61,8 @@ cargo fmt --all --check
 cargo doc --workspace --no-deps
 ```
 
+**MSRV (Minimum Supported Rust Version): 1.88.** Declared in `workspace.package.rust-version` and checked by the `msrv` CI job. It is driven by a transitive dependency (`darling` 0.24) that requires Rust 1.88. / **MSRV (versao minima do Rust suportada): 1.88.** Declarada em `workspace.package.rust-version` e verificada pelo job `msrv` do CI. Ela e determinada por uma dependencia transitiva (`darling` 0.24) que exige Rust 1.88.
+
 ## Why this suite? / Por que esta suite?
 
 **PT:** O stack oficial Charmbracelet e excelente, mas deixa lacunas: nao ha wizard pronto, nem sistema de temas unificado, nem framework de testes dedicado, nem DevTools, nem i18n, nem layout responsivo. A Charm Suite preenche cada uma dessas lacunas com bibliotecas pequenas, focadas e interoperaveis — todas portadas para Rust idiomático, estilizadas com `lipgloss`.
@@ -66,7 +71,17 @@ cargo doc --workspace --no-deps
 
 ## Contributing / Contribuindo
 
+> **⚠️ Mirror somente-leitura / Read-only mirror**
+>
+> **EN:** The Forgejo repository is the source of truth. The GitHub repository is a **read-only push mirror**: issues and pull requests opened there are **not** seen by the maintainers. Please open issues and PRs on Forgejo: <https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust>
+>
+> **PT:** O repositório Forgejo é a origem. O GitHub é um **espelho somente-leitura**: issues e PRs abertos lá **não chegam** aos mantenedores. Abra issues e PRs no Forgejo: <https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust>
+
 Issues and PRs are welcome on any `charm-*` crate. Please keep changes small, idiomatic, and covered by tests where possible. / Issues e PRs sao bem-vindos em qualquer crate `charm-*`. Mantenha mudancas pequenas, idiomaticas e cobertas por testes quando possivel.
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): build, testes, Conventional Commits, fluxo de PR, golden files e release. / build, tests, Conventional Commits, PR flow, golden files and release.
+- [KNOWN_DIFFERENCES.md](KNOWN_DIFFERENCES.md): diferenças conhecidas em relação ao Go original. / known differences from the Go original.
+- [SECURITY.md](SECURITY.md): como reportar vulnerabilidades. / how to report vulnerabilities.
 
 ## License / Licenca
 

@@ -29,6 +29,7 @@ fn main() {
     let opts = Options {
         context_lines: 10,
         style: DiffStyle::github(),
+        ..Options::default()
     };
     print!("{}", unified_diff_with_options(old, new, &opts));
 

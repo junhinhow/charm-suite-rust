@@ -1,0 +1,24 @@
+[package]
+name = "charm-devtools-macros"
+description = "Macros derive para o charm-devtools."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["devtools", "derive", "macro", "tui", "charm"]
+categories = ["development-tools::debugging"]
+readme = "README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+syn = { workspace = true, features = ["full", "extra-traits"] }
+
+[lints]
+workspace = true
