@@ -2,6 +2,24 @@
 
 Middleware de desenvolvimento para models Bubble Tea. Ele registra um histórico limitado de mensagens, captura o estado renderizado e mostra um painel de inspeção ao pressionar **F12**. O painel também permite rolagem com **Up/Down** e troca de seção com **Tab**.
 
+## Instalação
+
+```toml
+[dependencies]
+charm-devtools = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
+```
+
+Com a feature opcional `derive` (`#[derive(DevInspect)]`):
+
+```toml
+[dependencies]
+charm-devtools = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0", features = ["derive"] }
+```
+
+Ainda não publicado no crates.io; instale via git.
+
+## Uso
+
 ```rust
 use charmed_bubbletea::{Cmd, Message, Model};
 use charm_devtools::{middleware, ComponentNode, DevInspect};

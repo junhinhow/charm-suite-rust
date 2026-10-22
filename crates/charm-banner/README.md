@@ -21,8 +21,10 @@ was extracted programmatically from the original Go source.
 
 ```toml
 [dependencies]
-charm-banner = "0.1"
+charm-banner = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Not yet published on crates.io; install from git.
 
 ## Usage
 

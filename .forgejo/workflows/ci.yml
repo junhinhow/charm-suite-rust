@@ -1,3 +1,7 @@
+# Forgejo Actions: este workflow só executa se houver um runner do Forgejo Actions
+# registrado nesta instância. Hoje não há runner registrado, então ele não roda.
+# O CI oficial do projeto é o do GitHub (.github/workflows/ci.yml, espelho).
+# Ver CONTRIBUTING.md, seção "CI". Não remova este arquivo.
 name: CI
 
 on:

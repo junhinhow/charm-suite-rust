@@ -21,8 +21,10 @@ que foram extraidos programaticamente do codigo Go original.
 
 ```toml
 [dependencies]
-charm-banner = "0.1"
+charm-banner = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

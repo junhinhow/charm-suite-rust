@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# A publicação no crates.io está adiada. Este script só deve ser usado depois de criar a conta/token e definir CARGO_REGISTRY_TOKEN.
 # Publica os crates da Charm Suite no crates.io, na ordem de dependência.
 #
 # Uso:

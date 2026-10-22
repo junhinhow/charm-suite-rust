@@ -14,9 +14,12 @@ identico byte a byte (apos remover os codigos de escape ANSI).
 
 ## Instalacao
 
-```bash
-cargo add charm-palette
+```toml
+[dependencies]
+charm-palette = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

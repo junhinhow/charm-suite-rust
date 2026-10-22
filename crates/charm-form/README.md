@@ -10,9 +10,12 @@ library: the YAML schema, the validation rules and the JSON layout are the same.
 
 ## Installation
 
-```bash
-cargo add charm-form
+```toml
+[dependencies]
+charm-form = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Not yet published on crates.io; install from git.
 
 ## Usage
 

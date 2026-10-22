@@ -1,9 +1,7 @@
 # CharmSuite-Rust
 
 <!-- MSRV: 1.88 (workspace.package.rust-version). Atualize este badge se a MSRV mudar. -->
-[![CI](https://github.com/junhinhow/charm-suite-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/junhinhow/charm-suite-rust/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-15803D?style=for-the-badge)](LICENSE) [![Rust 1.88+](https://img.shields.io/badge/Rust-1.88+-00ADD8?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-<!-- docs.rs: o badge só mostra documentação depois que o crate for publicado no crates.io. -->
-[![docs.rs](https://img.shields.io/docsrs/charm-suite?style=for-the-badge)](https://docs.rs/charm-suite)
+[![CI](https://github.com/junhinhow/charm-suite-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/junhinhow/charm-suite-rust/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-15803D?style=for-the-badge)](LICENSE) [![Rust 1.88+](https://img.shields.io/badge/Rust-1.88+-00ADD8?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/) [![Forgejo](https://img.shields.io/badge/Forgejo-repo-FB923C?style=for-the-badge)](https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust)
 
 **PT:** Um ecossistema curado de bibliotecas Rust para o stack **Charmbracelet / Bubble Tea**. Cada `charm-*` resolve uma lacuna especifica que falta no conjunto oficial.
 **EN:** A curated ecosystem of Rust libraries for the **Charmbracelet / Bubble Tea** stack. Each `charm-*` fills a specific gap missing from the official set.
@@ -36,16 +34,36 @@ Port Rust de [`junhinhow/charm-suite`](https://github.com/junhinhow/charm-suite)
 | [**charm-palette**](crates/charm-palette) | Terminal color palette viewer and generator — preview themes live | Visualizador e gerador de paletas de cor — preview de temas ao vivo |
 | [**charm-dialog**](crates/charm-dialog) | Modal dialogs for Bubble Tea — confirm, alert, input, custom | Dialogos modais para Bubble Tea — confirmar, alerta, input, customizado |
 
-## Quick Start / Comecando Rapido
+## Installation / Instalação
+
+> **Ainda não publicado no crates.io.** A publicação está planejada, mas sem data definida. Por enquanto, instale via git. / **Not yet published on crates.io.** Publishing is planned, but there is no date yet. For now, install from git.
+
+Os crates são um monorepo: cada um fica em `crates/<nome>/`. Adicione a biblioteca desejada ao `Cargo.toml` do seu projeto. / The crates live in a monorepo: each one is in `crates/<name>/`. Add the library you need to your project's `Cargo.toml`.
+
+```toml
+# Cargo.toml
+[dependencies]
+charm-color = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
+```
+
+- **`tag = "v0.1.0"`** fixa uma versão estável. Para acompanhar o desenvolvimento, use `branch = "main"` no lugar de `tag`. / **`tag = "v0.1.0"`** pins a stable release. To follow development, use `branch = "main"` instead of `tag`.
+- **Espelho no GitHub / GitHub mirror:** `https://github.com/junhinhow/charm-suite-rust` funciona igual: basta trocar a URL. / works the same way: just swap the URL.
+
+Exemplo rápido / Quick example:
+
+```rust
+use charm_color::{darken, Rgb};
+
+fn main() {
+    let red = Rgb::rgb(255, 0, 0);
+    println!("{}", darken(red, 0.3).to_hex());
+}
+```
+
+Instalação do binário `charm-table` (CLI) / Installing the `charm-table` binary (CLI):
 
 ```bash
-# Rust
-cargo add charm-color
-cargo add charm-layout
-cargo add charm-diff
-
-# Ou use o agregador completo
-cargo add charm-suite
+cargo install --git https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust charm-table-cli
 ```
 
 Cada crate tem seu proprio `README.md` com um exemplo minimo funcional.

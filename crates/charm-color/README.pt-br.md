@@ -12,9 +12,12 @@ truncamento e arredondamento.
 
 ## Instalação
 
-```bash
-cargo add charm-color
+```toml
+[dependencies]
+charm-color = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 
@@ -56,7 +59,7 @@ cargo run -p charm-color --example demo
 | `from_lipgloss(&str)` | Converte uma string de cor do lipgloss (`"#rrggbb"`, ANSI-256) |
 
 `Rgb::to_hex`, `Rgb::from_hex` e `Rgb::from_hex_or_black` vêm do crate
-[`charm-core`](https://crates.io/crates/charm-core) e ficam disponíveis através
+[`charm-core`](https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust/src/branch/main/crates/charm-core) e ficam disponíveis através
 do tipo [`Rgb`].
 
 ## Paridade com o original Go

@@ -2,6 +2,17 @@
 
 Deterministic test utilities for Bubble Tea models. `Simulator` delivers window-size and key messages, runs synchronous commands (including batches and sequences), and makes view assertions and Insta snapshots straightforward.
 
+## Installation
+
+```toml
+[dev-dependencies]
+charm-test = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
+```
+
+Not yet published on crates.io; install from git.
+
+## Usage
+
 ```rust
 use charmed_bubbletea::{Cmd, KeyMsg, KeyType, Message, Model};
 use charm_test::{Simulator, require_view_contains};

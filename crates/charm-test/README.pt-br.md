@@ -2,6 +2,17 @@
 
 Ferramentas determinísticas para testar models Bubble Tea. `Simulator` entrega mensagens de tamanho de janela e teclas, executa comandos síncronos (incluindo batches e sequências) e facilita assertions de view e snapshots Insta.
 
+## Instalação
+
+```toml
+[dev-dependencies]
+charm-test = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
+```
+
+Ainda não publicado no crates.io; instale via git.
+
+## Uso
+
 ```rust
 use charmed_bubbletea::{Cmd, KeyMsg, KeyType, Message, Model};
 use charm_test::{Simulator, require_view_contains};

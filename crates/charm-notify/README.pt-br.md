@@ -21,9 +21,12 @@ notificação nativa no Windows, macOS e Linux.
 
 ## Instalação
 
-```bash
-cargo add charm-notify
+```toml
+[dependencies]
+charm-notify = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

@@ -1,3 +1,4 @@
+# A publicacao no crates.io esta adiada. Este script so deve ser usado depois de criar a conta/token e definir CARGO_REGISTRY_TOKEN.
 # Publica os crates da Charm Suite no crates.io, na ordem de dependencia.
 #
 # Uso:

@@ -3,9 +3,12 @@
 # Uso (dry-run por padrão):  cargo release minor
 # Executar de verdade:       cargo release minor --execute
 #
-# A publicação no crates.io NÃO é feita pelo cargo-release (publish = false).
-# Use scripts/release.sh (ou scripts/release.ps1), que respeita a ordem de
-# dependência entre os crates. Ver CONTRIBUTING.md.
+# ADIADO: a publicação no crates.io está adiada (decisão do mantenedor).
+# Por enquanto a instalação é via git, com a tag v0.1.0 (ver docs/INSTALL.md).
+# Para habilitar: crie a conta/token do crates.io, defina CARGO_REGISTRY_TOKEN
+# e publique com scripts/release.sh (ou scripts/release.ps1), que respeita a
+# ordem de dependência. Só depois, se quiser que o cargo-release também publique,
+# mude publish = true. Ver CONTRIBUTING.md.
 
 # Todos os crates compartilham a mesma versão (version.workspace = true).
 shared-version = true
@@ -13,8 +16,8 @@ shared-version = true
 # Um único commit de release, em vez de um por crate.
 consolidate-commits = true
 
-# Tag só com a versão, ex.: 0.1.0.
-tag-prefix = ""
+# Tag com prefixo "v", ex.: v0.1.0.
+tag-prefix = "v"
 
 # Publicação manual, na ordem de dependência (scripts/release.sh).
 publish = false

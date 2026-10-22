@@ -116,9 +116,12 @@ println!("{}", sidebar.render());
 
 ## Instalacao
 
-```bash
-cargo add charm-nav
+```toml
+[dependencies]
+charm-nav = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Licenca
 

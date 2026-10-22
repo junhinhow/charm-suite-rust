@@ -6,6 +6,8 @@ de spinner, diff, diálogo de confirmação, toast, paleta de cores, traduções
 inglês e português, wizard de três etapas executado e um formulário YAML
 embutido convertido para JSON.
 
+É um exemplo executável que fica neste repositório (`publish = false`). Não é uma biblioteca para adicionar ao seu projeto.
+
 Execute com:
 
 ```sh

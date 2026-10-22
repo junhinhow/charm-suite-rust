@@ -1,8 +1,8 @@
 # CharmSuite-Rust — Roadmap de Portabilidade
 
 **Origem:** [`github.com/junhinhow/charm-suite`](https://github.com/junhinhow/charm-suite) (18 libs Go para o stack Charmbracelet/Bubble Tea)
-**Destino:** Workspace Cargo com 19 crates Rust publicados no crates.io
-**Status:** ✅ Portabilidade concluída — 19 crates (18 + agregador `charm-suite`) compilando, testando e passando em clippy/fmt/doc
+**Destino:** Workspace Cargo com 19 crates Rust, distribuídos via git (publicação no crates.io adiada)
+**Status:** ✅ Port concluído (19 crates compilando, testando e passando em clippy/fmt/doc) · ✅ CI verde no GitHub Actions · ✅ Publicado no Forgejo, com espelho no GitHub · ⏸️ Publicação no crates.io **adiada**
 
 ---
 
@@ -838,13 +838,15 @@ Em Rust **não existe reflexão em runtime**. Opções:
 **Entregáveis:**
 - [ ] `cargo publish --dry-run` para cada crate, em ordem de dependência
 - [ ] Tags `v0.1.0` por crate + tag `suite/v0.1.0`
-- [ ] Publicação no crates.io
+- [ ] Publicação no crates.io — **adiada**
 - [ ] Anúncio (README raiz, release notes)
 - [ ] Repos Go marcados como "portado para Rust" (link nos READMEs originais)
 
+> **Adiado:** decisão de não publicar no crates.io por enquanto. A instalação passa a ser via git, com a tag `v0.1.0` (ver `docs/INSTALL.md`). O `release.toml` mantém `publish = false` e o `tag-prefix` vira `"v"`. Os scripts `scripts/release.sh` e `scripts/release.ps1` só devem ser usados após criar a conta/token do crates.io e definir `CARGO_REGISTRY_TOKEN`.
+
 **Critérios de aceite:**
-- Todos os 18 crates publicados e instaláveis via `cargo add charm-color@0.1.0`
-- `cargo install charm-table-cli` funciona
+- Todos os 18 crates publicados e instaláveis via `cargo add charm-color@0.1.0` *(adiado: ver nota acima)*
+- `cargo install charm-table-cli` funciona via git (`--tag v0.1.0`)
 
 **Esforço:** ~16h
 
@@ -861,7 +863,7 @@ Em Rust **não existe reflexão em runtime**. Opções:
 | P4 | i18n, wizard, form, notify | 58h | 248h | P0 |
 | P5 | test, devtools | 56h | 304h | P0, P2 |
 | P6 | table-cli, docs | 44h | 348h | P1, P2 |
-| P7 | release | 16h | **364h** | P6 |
+| P7 | release (publicação no crates.io **adiada**; instalação via git, tag `v0.1.0`) | 16h | **364h** | P6 |
 
 **364h ÷ 40h/semana ≈ 9,1 semanas** (1 dev). Com 2 devs paralelizando P1/P2/P4: **~6 semanas**.
 

@@ -30,7 +30,7 @@ assert_eq!(tree.children[1].name, "menu[0]");
 assert_eq!(tree.children[2].name, "menu[1]");
 ```
 
-Enable the `derive` feature on `charm-devtools`. Fields without an inspection
+This crate is used indirectly: do not add it to your `Cargo.toml`. Enable the `derive` feature on `charm-devtools` instead (see its README for the install snippet). Fields without an inspection
 attribute are ignored. Tuple and unit structs generate a root node only.
 
 ## Português (Brasil)

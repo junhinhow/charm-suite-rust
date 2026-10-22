@@ -14,9 +14,12 @@ are stripped).
 
 ## Installation
 
-```bash
-cargo add charm-palette
+```toml
+[dependencies]
+charm-palette = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Not yet published on crates.io; install from git.
 
 ## Usage
 

@@ -15,6 +15,6 @@ struct Screen {
 }
 ```
 
-Ative a feature `derive` em `charm-devtools`. Campos sem atributo são ignorados;
+Este crate é usado indiretamente: não o adicione ao seu `Cargo.toml`. Ative a feature `derive` em `charm-devtools` (veja o README dele para o trecho de instalação). Campos sem atributo são ignorados;
 structs tupla e unitárias geram somente o nó raiz. Campos `Vec<T>` inspecionados
 geram filhos com nomes `campo[índice]`.

@@ -14,9 +14,12 @@ renderizacao, as regras de reamostragem e o layout sao identicos byte a byte
 
 ## Instalacao
 
-```bash
-cargo add charm-charts
+```toml
+[dependencies]
+charm-charts = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Graficos
 

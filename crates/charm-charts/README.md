@@ -12,9 +12,12 @@ byte-for-byte identical (after the ANSI escape codes are stripped).
 
 ## Installation
 
-```bash
-cargo add charm-charts
+```toml
+[dependencies]
+charm-charts = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Not yet published on crates.io; install from git.
 
 ## Charts
 

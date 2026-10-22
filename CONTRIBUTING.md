@@ -141,6 +141,33 @@ INSTA_UPDATE=always cargo test -p charm-test
 
 Revise os arquivos em `snapshots/` antes de commitar.
 
+## CI
+
+O CI canônico roda no **GitHub Actions**, no workflow
+[`.github/workflows/ci.yml`](https://github.com/junhinhow/charm-suite-rust/blob/main/.github/workflows/ci.yml)
+do espelho (<https://github.com/junhinhow/charm-suite-rust/actions>). Ele tem 11
+jobs (fmt, clippy, test em Linux/Windows/macOS, doc, metadata, msrv, deny,
+coverage, bench e fuzz manual) e é a referência de status do projeto.
+
+O **Forgejo Actions** está configurado em
+[`.forgejo/workflows/ci.yml`](.forgejo/workflows/ci.yml), mas **não executa**:
+a instância do Forgejo não tem nenhum runner registrado.
+
+Para registrar um runner, quando quiser migrar o CI para o Forgejo:
+
+```bash
+# Token em Settings → Actions → Runners (do repositório ou da instância).
+act_runner register --instance https://forgejo.multiservidores.com.br --token <TOKEN> --name <nome> --labels ubuntu-latest:docker://node:20-bookworm
+act_runner daemon
+```
+
+O label `ubuntu-latest` é necessário porque os jobs usam `runs-on: ubuntu-latest`.
+
+## Instalação para usuários
+
+Enquanto a publicação no crates.io estiver adiada, a instalação é via git. Veja
+[docs/INSTALL.md](docs/INSTALL.md).
+
 ## Release
 
 O release é feito por mantenedores. Os detalhes estão na seção abaixo.
@@ -152,7 +179,7 @@ com:
 
 - `shared-version = true`: todos os crates usam a mesma versão (lockstep).
 - `consolidate-commits = true`: um único commit de release.
-- `tag-prefix = ""`: a tag é só a versão (ex.: `0.1.0`).
+- `tag-prefix = "v"`: a tag leva o prefixo `v` (ex.: `v0.1.0`).
 - `publish = false`: o `cargo-release` **não publica**. A publicação é manual, na ordem de dependência, pelo script abaixo.
 - `push = false`: nada é enviado ao remoto automaticamente.
 - `pre-release-replacements`: move a seção `[Unreleased]` do `CHANGELOG.md` raiz para a nova versão.
@@ -172,6 +199,11 @@ cargo release minor --execute
 Troque `minor` por `patch` ou `major`, ou use uma versão explícita (`0.1.1`).
 
 ### Publicação no crates.io (`scripts/release.sh` / `scripts/release.ps1`)
+
+> **Adiado:** decisão de não publicar no crates.io por enquanto. A instalação
+> passa a ser via git (tag `v0.1.0`, ver [docs/INSTALL.md](docs/INSTALL.md)).
+> Os scripts abaixo só devem ser usados depois de criar a conta/token do
+> crates.io e definir `CARGO_REGISTRY_TOKEN`.
 
 A publicação segue a ordem topológica das dependências internas:
 

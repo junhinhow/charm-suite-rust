@@ -11,9 +11,12 @@ regras de validação e o layout do JSON são os mesmos.
 
 ## Instalação
 
-```bash
-cargo add charm-form
+```toml
+[dependencies]
+charm-form = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

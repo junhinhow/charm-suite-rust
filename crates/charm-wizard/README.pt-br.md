@@ -18,8 +18,10 @@ Este é um port em Rust da biblioteca Go [`github.com/junhinhow/charm-wizard`](h
 
 ```toml
 [dependencies]
-charm-wizard = "0.1"
+charm-wizard = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

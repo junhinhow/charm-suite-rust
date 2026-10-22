@@ -6,6 +6,8 @@ three spinner frames, a unified diff, confirmation dialog, toast, generated
 color palette, English/Portuguese translations, an executed three-step wizard,
 and a YAML form embedded in the binary and printed as JSON.
 
+This is a runnable example that lives in this repository (`publish = false`). It is not a library to add to your project.
+
 Run it with:
 
 ```sh

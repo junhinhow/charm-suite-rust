@@ -12,9 +12,12 @@ verificada contra golden files gerados pelo original em Go.
 
 ## Instalacao
 
-```bash
-cargo add charm-toast
+```toml
+[dependencies]
+charm-toast = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

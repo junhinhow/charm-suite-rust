@@ -13,11 +13,11 @@ A crate se chama `charm-table-cli`, mas o binario instalado se chama
 
 ## Instalacao
 
-A partir de um checkout local deste workspace:
-
 ```bash
-cargo install --path crates/charm-table-cli
+cargo install --git https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust charm-table-cli
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

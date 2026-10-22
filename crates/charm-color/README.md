@@ -12,9 +12,12 @@ and rounding rules.
 
 ## Install
 
-```bash
-cargo add charm-color
+```toml
+[dependencies]
+charm-color = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Not yet published on crates.io; install from git.
 
 ## Usage
 
@@ -56,7 +59,7 @@ cargo run -p charm-color --example demo
 | `from_lipgloss(&str)` | Parses a lipgloss color string (`"#rrggbb"`, ANSI-256) |
 
 `Rgb::to_hex`, `Rgb::from_hex` and `Rgb::from_hex_or_black` come from the
-[`charm-core`](https://crates.io/crates/charm-core) crate and are re-exported
+[`charm-core`](https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust/src/branch/main/crates/charm-core) crate and are re-exported
 through the [`Rgb`] type.
 
 ## Parity with the Go original

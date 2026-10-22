@@ -1,15 +1,15 @@
-# charm-core
+﻿# charm-core
 
-Shared primitives of the **Charm Suite Rust**.
+Primitivos compartilhados da **Charm Suite Rust**.
 
-This crate is for **internal** use. It centralises the canonical colour type
-[`Rgb`], text utilities ([`strip_ansi`], [`display_width`], [`pad_or_truncate`],
-[`split_lines`], [`truncate`]) and the standard [`Error`].
+Este crate e de uso **interno** apenas: e uma dependencia dos outros crates e nao deve ser adicionado diretamente a uma aplicacao. Ele centraliza o tipo de cor canonico
+[`Rgb`], utilitarios de texto ([`strip_ansi`], [`display_width`],
+[`pad_or_truncate`], [`split_lines`], [`truncate`]) e o erro padrao [`Error`].
 
-The public API is unstable — only the suite's own crates should depend on it
-directly. End users should depend on the individual libraries (`charm-color`,
-`charm-layout`, …).
+A API publica e instavel â€” apenas os crates da suite devem depender dela
+diretamente. Usuarios finais devem usar as bibliotecas individuais
+(`charm-color`, `charm-layout`, etc.).
 
-## License
+## Licenca
 
 MIT

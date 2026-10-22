@@ -12,9 +12,12 @@ golden files gerados pelo original em Go.
 
 ## Instalacao
 
-```bash
-cargo add charm-dialog
+```toml
+[dependencies]
+charm-dialog = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

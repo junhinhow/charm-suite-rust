@@ -11,9 +11,12 @@ e mantem o comportamento byte a byte.
 
 ## Instalacao
 
-```bash
-cargo add charm-spinner
+```toml
+[dependencies]
+charm-spinner = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Ainda não publicado no crates.io; instale via git.
 
 ## Uso
 

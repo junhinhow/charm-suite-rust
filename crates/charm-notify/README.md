@@ -20,9 +20,12 @@ library. It shows a native notification on Windows, macOS and Linux.
 
 ## Installation
 
-```bash
-cargo add charm-notify
+```toml
+[dependencies]
+charm-notify = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Not yet published on crates.io; install from git.
 
 ## Usage
 

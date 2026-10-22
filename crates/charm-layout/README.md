@@ -25,9 +25,12 @@ and keeps its behaviour byte for byte.
 
 ## Installation
 
-```bash
-cargo add charm-layout
+```toml
+[dependencies]
+charm-layout = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Not yet published on crates.io; install from git.
 
 ## Quick start
 

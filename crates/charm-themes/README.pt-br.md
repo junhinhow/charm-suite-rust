@@ -7,6 +7,15 @@ e qualquer outro componente do seu TUI.
 
 > **[Read in English](README.md)**
 
+## Instalacao
+
+```toml
+[dependencies]
+charm-themes = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
+```
+
+Ainda nao publicado no crates.io; instale via git.
+
 ## O Problema
 
 Cada sistema de estilos pede as mesmas cores de novo:
@@ -79,7 +88,7 @@ pub struct Theme {
 }
 ```
 
-`Rgb` vem do [`charm-core`](https://crates.io/crates/charm-core) e e o tipo de
+`Rgb` vem do [`charm-core`](https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust/src/branch/main/crates/charm-core) e e o tipo de
 cor canonico da Charm Suite. A conversao para `lipgloss::Color` e feita por
 `to_lipgloss()` e `from_lipgloss_str()`.
 

@@ -18,8 +18,10 @@ This is a Rust port of the Go library [`github.com/junhinhow/charm-diff`](https:
 
 ```toml
 [dependencies]
-charm-diff = "0.1"
+charm-diff = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
+
+Not yet published on crates.io; install from git.
 
 ## Usage
 
