@@ -154,13 +154,17 @@ fn push_rule(
 }
 
 /// Writes one line of cells, followed by a newline.
+///
+/// `lipgloss` counts the padding inside `width`, so the style is given the
+/// content width plus the 2 padding columns. Each cell then fills exactly
+/// `width + 2` columns, matching the rule drawn by [`push_rule`].
 fn push_row(out: &mut String, border: &Border, cells: &[String], widths: &[usize], style: &Style) {
     out.push_str(border.left);
     for (index, width) in widths.iter().enumerate() {
         let cell = cells.get(index).map_or("", String::as_str);
         let content = truncate(cell, *width);
-        let width = i32::try_from(*width).unwrap_or(i32::MAX);
-        out.push_str(&style.clone().width(width).render(&content));
+        let total = i32::try_from(width.saturating_add(2)).unwrap_or(i32::MAX);
+        out.push_str(&style.clone().width(total).render(&content));
         if index + 1 < widths.len() {
             out.push_str(border.left);
         }

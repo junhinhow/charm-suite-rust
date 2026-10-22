@@ -17,7 +17,7 @@ readme = "README.md"
 lipgloss.workspace = true
 
 [dev-dependencies]
-charm-parity.workspace = true
+charm-parity = { path = "../../tools/parity" }
 
 [lints]
 workspace = true

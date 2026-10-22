@@ -83,20 +83,16 @@ Comando e saida (codigos ANSI removidos):
 ```text
 $ charm-table pessoas.csv
 ╭───────┬───────┬──────────╮
-│ nom 
- e   │ ida 
- de  │ cidade │
+│ nome  │ idade │ cidade   │
 ├───────┼───────┼──────────┤
-│ Ana │ 31  │ Recife │
-│ Bru 
- no  │ 27  │ Salvad 
- or     │
+│ Ana   │ 31    │ Recife   │
+│ Bruno │ 27    │ Salvador │
 ╰───────┴───────┴──────────╯
 ```
 
-Esta e a saida real da ferramenta, e ela bate com o original em Go. As celulas
-quebram em linhas extras, o que desalinha a tabela. Veja
-[Herdado do original em Go](#herdado-do-original-em-go) para a causa.
+Esta e a saida real da ferramenta, e ela bate com o original em Go. Cada
+coluna tem a largura do seu maior valor, mais um espaco de padding de cada lado,
+entao cada linha fica em uma unica linha e as bordas ficam alinhadas.
 
 Execute a demo para ver todos os estilos de borda:
 
@@ -137,12 +133,6 @@ cargo test -p charm-table-cli
 
 Estes comportamentos sao reproduzidos de proposito, para manter a paridade:
 
-- **As celulas quebram e a tabela pode sair desalinhada.** O codigo Go chama
-  `Width(largura_da_coluna)` num estilo que tem padding. No lipgloss, a largura
-  inclui o padding, entao o conteudo fica com `largura_da_coluna - 2` colunas e
-  textos mais longos quebram em novas linhas. Usar `Width(largura_da_coluna + 2)`
-  corrigiria o alinhamento; esta crate mantem o comportamento do Go ate que a
-  correcao seja decidida no projeto original.
 - **`--max-width` e aproximado.** Cada coluna perde a mesma parte do excesso e
   nunca fica abaixo de 3 caracteres, entao uma tabela muito estreita ainda pode
   ser mais larga que o limite.

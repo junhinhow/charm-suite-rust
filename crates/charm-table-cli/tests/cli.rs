@@ -96,8 +96,8 @@ fn plain(text: &str) -> String {
     charm_core::strip_ansi(text)
 }
 
-/// Keeps only letters and digits. Cells wrap inside the table (the Go original
-/// sets `Width` including padding), so words can be split across lines.
+/// Keeps only letters and digits, so the assertions ignore borders, padding and
+/// line breaks.
 fn squashed(text: &str) -> String {
     plain(text)
         .chars()
@@ -135,6 +135,16 @@ fn border_styles_draw_their_corners() {
         assert!(top.starts_with(left), "{style}: {top}");
         assert!(top.ends_with(right), "{style}: {top}");
     }
+}
+
+#[test]
+fn every_table_line_has_the_same_width() {
+    let out = stdout_of(&[], CSV_SAMPLE);
+    let widths: Vec<usize> = out
+        .lines()
+        .map(|line| charm_core::display_width(&plain(line)))
+        .collect();
+    assert!(widths.windows(2).all(|pair| pair[0] == pair[1]), "{out}");
 }
 
 #[test]

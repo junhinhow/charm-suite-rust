@@ -5,6 +5,17 @@ All notable changes to this crate are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Table cells no longer wrap onto extra lines, and the table stays aligned.
+  The cell style was given the column width, but `lipgloss` counts the padding
+  inside that width, so each cell lost two columns. The width now includes the
+  padding (`column width + 2`). The Go reference program
+  (`reference/go/charm-table-cli`) receives the same fix, and the golden file
+  was regenerated from it.
+
 ## [0.1.0]
 
 ### Added
@@ -25,4 +36,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - English and Portuguese (`pt-BR`) documentation, including the list of known
   differences from the Go original.
 
+[Unreleased]: https://forgejo.org/junhinhow/CharmSuite-Rust
 [0.1.0]: https://forgejo.org/junhinhow/CharmSuite-Rust

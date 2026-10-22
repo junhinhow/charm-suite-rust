@@ -1,234 +1,119 @@
 ### csv_rounded
 ╭───────┬───────┬────────────────┬─────────────────────────────────────────────────╮
-│ [1;38;5;63mnom[m 
- [1;38;5;63me[m   │ [1;38;5;63mida[m 
- [1;38;5;63mde[m  │ [1;38;5;63mcidade[m       │ [1;38;5;63mdescricao[m                                     │
+│ [1;38;5;63mnome[m  │ [1;38;5;63midade[m │ [1;38;5;63mcidade[m         │ [1;38;5;63mdescricao[m                                       │
 ├───────┼───────┼────────────────┼─────────────────────────────────────────────────┤
-│ Ana │ 31  │ São Paulo    │ Engenheira de software sênior                 │
-│ Bru 
- no  │ 27  │ Rio de       
- Janeiro      │ Analista, dados                               │
-│ Car 
- la  │ 45  │ Belo         
- Horizonte    │                                               │
-│ Dár 
- io  │     │ Curitiba     │ Gerente de produto com muitas                 
- responsabilidades                             │
+│ Ana   │ 31    │ São Paulo      │ Engenheira de software sênior                   │
+│ Bruno │ 27    │ Rio de Janeiro │ Analista, dados                                 │
+│ Carla │ 45    │ Belo Horizonte │                                                 │
+│ Dário │       │ Curitiba       │ Gerente de produto com muitas responsabilidades │
 ╰───────┴───────┴────────────────┴─────────────────────────────────────────────────╯
 ### csv_thick
 ┏━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ [1;38;5;63mnom[m 
- [1;38;5;63me[m   ┃ [1;38;5;63mida[m 
- [1;38;5;63mde[m  ┃ [1;38;5;63mcidade[m       ┃ [1;38;5;63mdescricao[m                                     ┃
+┃ [1;38;5;63mnome[m  ┃ [1;38;5;63midade[m ┃ [1;38;5;63mcidade[m         ┃ [1;38;5;63mdescricao[m                                       ┃
 ┣━━━━━━━╋━━━━━━━╋━━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃ Ana ┃ 31  ┃ São Paulo    ┃ Engenheira de software sênior                 ┃
-┃ Bru 
- no  ┃ 27  ┃ Rio de       
- Janeiro      ┃ Analista, dados                               ┃
-┃ Car 
- la  ┃ 45  ┃ Belo         
- Horizonte    ┃                                               ┃
-┃ Dár 
- io  ┃     ┃ Curitiba     ┃ Gerente de produto com muitas                 
- responsabilidades                             ┃
+┃ Ana   ┃ 31    ┃ São Paulo      ┃ Engenheira de software sênior                   ┃
+┃ Bruno ┃ 27    ┃ Rio de Janeiro ┃ Analista, dados                                 ┃
+┃ Carla ┃ 45    ┃ Belo Horizonte ┃                                                 ┃
+┃ Dário ┃       ┃ Curitiba       ┃ Gerente de produto com muitas responsabilidades ┃
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 ### csv_double
 ╔═══════╦═══════╦════════════════╦═════════════════════════════════════════════════╗
-║ [1;38;5;63mnom[m 
- [1;38;5;63me[m   ║ [1;38;5;63mida[m 
- [1;38;5;63mde[m  ║ [1;38;5;63mcidade[m       ║ [1;38;5;63mdescricao[m                                     ║
+║ [1;38;5;63mnome[m  ║ [1;38;5;63midade[m ║ [1;38;5;63mcidade[m         ║ [1;38;5;63mdescricao[m                                       ║
 ╠═══════╬═══════╬════════════════╬═════════════════════════════════════════════════╣
-║ Ana ║ 31  ║ São Paulo    ║ Engenheira de software sênior                 ║
-║ Bru 
- no  ║ 27  ║ Rio de       
- Janeiro      ║ Analista, dados                               ║
-║ Car 
- la  ║ 45  ║ Belo         
- Horizonte    ║                                               ║
-║ Dár 
- io  ║     ║ Curitiba     ║ Gerente de produto com muitas                 
- responsabilidades                             ║
+║ Ana   ║ 31    ║ São Paulo      ║ Engenheira de software sênior                   ║
+║ Bruno ║ 27    ║ Rio de Janeiro ║ Analista, dados                                 ║
+║ Carla ║ 45    ║ Belo Horizonte ║                                                 ║
+║ Dário ║       ║ Curitiba       ║ Gerente de produto com muitas responsabilidades ║
 ╚═══════╩═══════╩════════════════╩═════════════════════════════════════════════════╝
 ### csv_ascii
 ┌───────┬───────┬────────────────┬─────────────────────────────────────────────────┐
-│ [1;38;5;63mnom[m 
- [1;38;5;63me[m   │ [1;38;5;63mida[m 
- [1;38;5;63mde[m  │ [1;38;5;63mcidade[m       │ [1;38;5;63mdescricao[m                                     │
+│ [1;38;5;63mnome[m  │ [1;38;5;63midade[m │ [1;38;5;63mcidade[m         │ [1;38;5;63mdescricao[m                                       │
 ├───────┼───────┼────────────────┼─────────────────────────────────────────────────┤
-│ Ana │ 31  │ São Paulo    │ Engenheira de software sênior                 │
-│ Bru 
- no  │ 27  │ Rio de       
- Janeiro      │ Analista, dados                               │
-│ Car 
- la  │ 45  │ Belo         
- Horizonte    │                                               │
-│ Dár 
- io  │     │ Curitiba     │ Gerente de produto com muitas                 
- responsabilidades                             │
+│ Ana   │ 31    │ São Paulo      │ Engenheira de software sênior                   │
+│ Bruno │ 27    │ Rio de Janeiro │ Analista, dados                                 │
+│ Carla │ 45    │ Belo Horizonte │                                                 │
+│ Dário │       │ Curitiba       │ Gerente de produto com muitas responsabilidades │
 └───────┴───────┴────────────────┴─────────────────────────────────────────────────┘
 ### csv_no_header
 ╭───────┬───────┬────────────────┬─────────────────────────────────────────────────╮
-│ [1;38;5;63mCol[m 
- [1;38;5;63m1[m   │ [1;38;5;63mCol[m 
- [1;38;5;63m2[m   │ [1;38;5;63mCol3[m         │ [1;38;5;63mCol4[m                                          │
+│ [1;38;5;63mCol1[m  │ [1;38;5;63mCol2[m  │ [1;38;5;63mCol3[m           │ [1;38;5;63mCol4[m                                            │
 ├───────┼───────┼────────────────┼─────────────────────────────────────────────────┤
-│ nom 
- e   │ ida 
- de  │ cidade       │ descricao                                     │
-│ Ana │ 31  │ São Paulo    │ Engenheira de software sênior                 │
-│ Bru 
- no  │ 27  │ Rio de       
- Janeiro      │ Analista, dados                               │
-│ Car 
- la  │ 45  │ Belo         
- Horizonte    │                                               │
-│ Dár 
- io  │     │ Curitiba     │ Gerente de produto com muitas                 
- responsabilidades                             │
+│ nome  │ idade │ cidade         │ descricao                                       │
+│ Ana   │ 31    │ São Paulo      │ Engenheira de software sênior                   │
+│ Bruno │ 27    │ Rio de Janeiro │ Analista, dados                                 │
+│ Carla │ 45    │ Belo Horizonte │                                                 │
+│ Dário │       │ Curitiba       │ Gerente de produto com muitas responsabilidades │
 ╰───────┴───────┴────────────────┴─────────────────────────────────────────────────╯
 ### csv_max_width_40
 ╭─────┬─────┬─────┬──────────────────────────────────────╮
-│ [1;38;5;63mn[m 
- [1;38;5;63mo[m 
- [1;38;5;63mm[m │ [1;38;5;63mi[m 
- [1;38;5;63md[m 
- [1;38;5;63ma[m │ [1;38;5;63mc[m 
- [1;38;5;63mi[m 
- [1;38;5;63md[m │ [1;38;5;63mdescricao[m                          │
+│ [1;38;5;63mnom[m │ [1;38;5;63mida[m │ [1;38;5;63mcid[m │ [1;38;5;63mdescricao[m                            │
 ├─────┼─────┼─────┼──────────────────────────────────────┤
-│ A 
- n 
- a │ 3 
- 1 │ S 
- ã 
- o │ Engenheira de software sênior      │
-│ B 
- r 
- u │ 2 
- 7 │ R 
- i 
- o │ Analista, dados                    │
-│ C 
- a 
- r │ 4 
- 5 │ B 
- e 
- l │                                    │
-│ D 
- á 
- r │   │ C 
- u 
- r │ Gerente de produto com muitas      
- res...                             │
+│ Ana │ 31  │ São │ Engenheira de software sênior        │
+│ Bru │ 27  │ Rio │ Analista, dados                      │
+│ Car │ 45  │ Bel │                                      │
+│ Dár │     │ Cur │ Gerente de produto com muitas res... │
 ╰─────┴─────┴─────┴──────────────────────────────────────╯
 ### csv_max_width_12
 ╭─────┬─────┬─────┬───────────────────────────────╮
-│ [1;38;5;63mn[m 
- [1;38;5;63mo[m 
- [1;38;5;63mm[m │ [1;38;5;63mi[m 
- [1;38;5;63md[m 
- [1;38;5;63ma[m │ [1;38;5;63mc[m 
- [1;38;5;63mi[m 
- [1;38;5;63md[m │ [1;38;5;63mdescricao[m                   │
+│ [1;38;5;63mnom[m │ [1;38;5;63mida[m │ [1;38;5;63mcid[m │ [1;38;5;63mdescricao[m                     │
 ├─────┼─────┼─────┼───────────────────────────────┤
-│ A 
- n 
- a │ 3 
- 1 │ S 
- ã 
- o │ Engenheira de software      
- sênior                      │
-│ B 
- r 
- u │ 2 
- 7 │ R 
- i 
- o │ Analista, dados             │
-│ C 
- a 
- r │ 4 
- 5 │ B 
- e 
- l │                             │
-│ D 
- á 
- r │   │ C 
- u 
- r │ Gerente de produto com      
- mui...                      │
+│ Ana │ 31  │ São │ Engenheira de software sênior │
+│ Bru │ 27  │ Rio │ Analista, dados               │
+│ Car │ 45  │ Bel │                               │
+│ Dár │     │ Cur │ Gerente de produto com mui... │
 ╰─────┴─────┴─────┴───────────────────────────────╯
 ### csv_color_hex
 ╭───────┬───────┬────────────────┬─────────────────────────────────────────────────╮
-│ [1;38;2;255;0;0mnom[m 
- [1;38;2;255;0;0me[m   │ [1;38;2;255;0;0mida[m 
- [1;38;2;255;0;0mde[m  │ [1;38;2;255;0;0mcidade[m       │ [1;38;2;255;0;0mdescricao[m                                     │
+│ [1;38;2;255;0;0mnome[m  │ [1;38;2;255;0;0midade[m │ [1;38;2;255;0;0mcidade[m         │ [1;38;2;255;0;0mdescricao[m                                       │
 ├───────┼───────┼────────────────┼─────────────────────────────────────────────────┤
-│ Ana │ 31  │ São Paulo    │ Engenheira de software sênior                 │
-│ Bru 
- no  │ 27  │ Rio de       
- Janeiro      │ Analista, dados                               │
-│ Car 
- la  │ 45  │ Belo         
- Horizonte    │                                               │
-│ Dár 
- io  │     │ Curitiba     │ Gerente de produto com muitas                 
- responsabilidades                             │
+│ Ana   │ 31    │ São Paulo      │ Engenheira de software sênior                   │
+│ Bruno │ 27    │ Rio de Janeiro │ Analista, dados                                 │
+│ Carla │ 45    │ Belo Horizonte │                                                 │
+│ Dário │       │ Curitiba       │ Gerente de produto com muitas responsabilidades │
 ╰───────┴───────┴────────────────┴─────────────────────────────────────────────────╯
 ### tsv_rounded
 ╭────┬───────┬──────╮
-│ [1;38;5;63mid[m │ [1;38;5;63mnom[m 
- [1;38;5;63me[m   │ [1;38;5;63mno[m 
- [1;38;5;63mta[m │
+│ [1;38;5;63mid[m │ [1;38;5;63mnome[m  │ [1;38;5;63mnota[m │
 ├────┼───────┼──────┤
-│ 1 │ Ana │ 9. 
- 5  │
-│ 2 │ Bru 
- no  │ 7  │
-│ 3 │ Car 
- la  │ 10 │
+│ 1  │ Ana   │ 9.5  │
+│ 2  │ Bruno │ 7    │
+│ 3  │ Carla │ 10   │
 ╰────┴───────┴──────╯
 ### csv_semicolon_fallback
 ╭────────────╮
-│ [1;38;5;63mnome;ida[m 
- [1;38;5;63mde[m       │
+│ [1;38;5;63mnome;idade[m │
 ├────────────┤
-│ Ana;31   │
+│ Ana;31     │
 ╰────────────╯
 ### csv_single_line_header_quirk
 ╭──────┬───────╮
-│ [1;38;5;63mCo[m 
- [1;38;5;63ml1[m │ [1;38;5;63mCol[m 
- [1;38;5;63m2[m   │
+│ [1;38;5;63mCol1[m │ [1;38;5;63mCol2[m  │
 ├──────┼───────┤
-│ no 
- me │ ida 
- de  │
+│ nome │ idade │
 ╰──────┴───────╯
 ### json_array_nested
 ╭──────────────────────────────────────────╮
-│ [1;38;5;63mmeta[m                                   │
+│ [1;38;5;63mmeta[m                                     │
 ├──────────────────────────────────────────┤
-│ {"a":[1,2.5,"x\u0026y",null,true],"b": 
- 1}                                     │
-│ plain                                  │
-│                                        │
-│ 3                                      │
-│                                        │
+│ {"a":[1,2.5,"x\u0026y",null,true],"b":1} │
+│ plain                                    │
+│                                          │
+│ 3                                        │
+│                                          │
 ╰──────────────────────────────────────────╯
 ### jsonl_numbers
 ╭────────────────╮
-│ [1;38;5;63mv[m            │
+│ [1;38;5;63mv[m              │
 ├────────────────┤
-│ 1            │
-│ 2.5          │
-│ 1e-07        │
-│ 1.23456785e+ 
- 07           │
-│ 1e+21        │
-│ 0            │
-│ 1.2e-05      │
-│ 123456       │
-│ true         │
-│ texto        │
-│              │
+│ 1              │
+│ 2.5            │
+│ 1e-07          │
+│ 1.23456785e+07 │
+│ 1e+21          │
+│ 0              │
+│ 1.2e-05        │
+│ 123456         │
+│ true           │
+│ texto          │
+│                │
 ╰────────────────╯

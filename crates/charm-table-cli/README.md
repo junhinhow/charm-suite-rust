@@ -83,20 +83,16 @@ Command and output (ANSI codes removed):
 ```text
 $ charm-table people.csv
 ╭───────┬───────┬──────────╮
-│ nom 
- e   │ ida 
- de  │ cidade │
+│ nome  │ idade │ cidade   │
 ├───────┼───────┼──────────┤
-│ Ana │ 31  │ Recife │
-│ Bru 
- no  │ 27  │ Salvad 
- or     │
+│ Ana   │ 31    │ Recife   │
+│ Bruno │ 27    │ Salvador │
 ╰───────┴───────┴──────────╯
 ```
 
-This is the real output of the tool, and it matches the Go original. Cells
-wrap onto extra lines, which breaks the alignment. See
-[Inherited from the Go original](#inherited-from-the-go-original) for the cause.
+This is the real output of the tool, and it matches the Go original. Each
+column is as wide as its longest value, plus one space of padding on each side,
+so every row stays on one line and the borders line up.
 
 Run the demo to see every border style:
 
@@ -137,11 +133,6 @@ cargo test -p charm-table-cli
 
 These behaviors are reproduced on purpose, to keep parity:
 
-- **Cells wrap and the table can be misaligned.** The Go code calls
-  `Width(colWidth)` on a style that has padding. In lipgloss the width includes
-  the padding, so the content gets `colWidth - 2` columns and longer text wraps
-  onto new lines. Using `Width(colWidth + 2)` would fix the alignment; this crate
-  keeps the Go behavior until the fix is decided upstream.
 - **`--max-width` is approximate.** Each column loses the same share of the
   excess and never goes below 3 characters, so a very narrow table can still
   be wider than the limit.

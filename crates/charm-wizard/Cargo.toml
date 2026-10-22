@@ -19,7 +19,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-charm-parity.workspace = true
+charm-parity = { path = "../../tools/parity" }
 
 [lints]
 workspace = true

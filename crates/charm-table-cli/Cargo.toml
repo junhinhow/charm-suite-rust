@@ -25,7 +25,7 @@ serde_json = { workspace = true, features = ["preserve_order"] }
 thiserror.workspace = true
 
 [dev-dependencies]
-charm-parity.workspace = true
+charm-parity = { path = "../../tools/parity" }
 
 [lints]
 workspace = true
