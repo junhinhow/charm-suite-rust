@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-features
+
+  doc:
+    name: doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+  publish-dry-run:
+    name: publish dry-run
+    needs: [fmt, clippy, test, doc]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Verifica os metadados de publicacao
+        run: |
+          cargo install cargo-release --locked
+          cargo release --workspace --dry-run --no-publish --no-tag --no-verify || true
+      - name: Publicacao de teste por crate
+        run: |
+          set -e
+          for p in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.publish != ["false"]) | .name'); do
+            echo "::group::$p"
+            cargo publish -p "$p" --dry-run --allow-dirty
+            echo "::endgroup::"
+          done
+
+  parity:
+    name: parity (Go -> Rust)
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Clona as referencias Go
+        run: |
+          mkdir -p reference/go
+          for r in charm-banner charm-charts charm-color charm-devtools charm-dialog \
+                   charm-diff charm-form charm-i18n charm-layout charm-nav charm-notify \
+                   charm-palette charm-spinner charm-table-cli charm-test charm-themes \
+                   charm-toast charm-wizard; do
+            git clone --depth 1 "https://github.com/junhinhow/$r.git" "reference/go/$r"
+          done
+      - name: Testes de paridade
+        run: cargo test --workspace --features parity

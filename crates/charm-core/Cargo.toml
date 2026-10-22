@@ -1,0 +1,22 @@
+[package]
+name = "charm-core"
+description = "Primitivos compartilhados da Charm Suite Rust: cores, texto e utilitarios de terminal."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+lipgloss.workspace = true
+palette.workspace = true
+thiserror.workspace = true
+unicode-width.workspace = true
+
+[lints]
+workspace = true

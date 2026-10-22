@@ -1,0 +1,16 @@
+/target
+**/*.rs.bk
+*.pdb
+*.ilk
+
+# reference clones of the Go originals (used by the parity harness)
+reference/
+
+# editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# forgejo / github
+*.log

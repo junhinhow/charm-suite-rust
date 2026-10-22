@@ -1,0 +1,17 @@
+[package]
+name = "charm-parity"
+description = "Harness de paridade Go -> Rust da Charm Suite."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+charm-core.workspace = true
+
+[lints]
+workspace = true
