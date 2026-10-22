@@ -2,7 +2,7 @@
 
 **Origem:** [`github.com/junhinhow/charm-suite`](https://github.com/junhinhow/charm-suite) (18 libs Go para o stack Charmbracelet/Bubble Tea)
 **Destino:** Workspace Cargo com 19 crates Rust publicados no crates.io
-**Status:** 🟡 Planejamento concluído — aguardando aprovação da Fase P0
+**Status:** ✅ Portabilidade concluída — 19 crates (18 + agregador `charm-suite`) compilando, testando e passando em clippy/fmt/doc
 
 ---
 
@@ -918,25 +918,25 @@ Fluxo:
 
 | Go | Rust | Crate | Fase | Testes | Status |
 |---|---|---|---|---|---|
-| `charm-color/color.go` | `crates/charm-color/src/lib.rs` | `charm-color` | P1 | 12 | ⬜ |
-| `charm-themes/{theme,themes,lipgloss}.go` | `crates/charm-themes/src/{theme,themes,lipgloss}.rs` | `charm-themes` | P1 | 6 | ⬜ |
-| `charm-spinner/spinner.go` | `crates/charm-spinner/src/lib.rs` | `charm-spinner` | P1 | 30+30 | ⬜ |
-| `charm-banner/banner.go` | `crates/charm-banner/src/{lib,fonts}.rs` | `charm-banner` | P1 | 10 | ⬜ |
-| `charm-palette/palette.go` | `crates/charm-palette/src/lib.rs` | `charm-palette` | P1 | 6 | ⬜ |
-| `charm-layout/{layout,grid}.go` | `crates/charm-layout/src/{flex,grid}.rs` | `charm-layout` | P2 | 12 | ⬜ |
-| `charm-nav/{tabs,sidebar,breadcrumb}.go` | `crates/charm-nav/src/{tabs,sidebar,breadcrumb}.rs` | `charm-nav` | P2 | 12 | ⬜ |
-| `charm-charts/{sparkline,barchart,progress}.go` | `crates/charm-charts/src/{sparkline,barchart,progress}.rs` | `charm-charts` | P2 | 12 | ⬜ |
-| `charm-diff/{diff,styles}.go` | `crates/charm-diff/src/{lib,styles}.rs` | `charm-diff` | P3 | 15 | ⬜ |
-| `charm-dialog/dialog.go` | `crates/charm-dialog/src/lib.rs` | `charm-dialog` | P3 | 12 | ⬜ |
-| `charm-toast/toast.go` | `crates/charm-toast/src/lib.rs` | `charm-toast` | P3 | 16 | ⬜ |
-| `charm-wizard/{wizard,progress}.go` | `crates/charm-wizard/src/{wizard,progress}.rs` | `charm-wizard` | P4 | 12 | ⬜ |
-| `charm-i18n/i18n.go` | `crates/charm-i18n/src/lib.rs` | `charm-i18n` | P4 | 20 | ⬜ |
-| `charm-form/{form,generate}.go` | `crates/charm-form/src/{lib,spec}.rs` | `charm-form` | P4 | 12 | ⬜ |
-| `charm-notify/notify*.go` | `crates/charm-notify/src/{lib,platform/*}.rs` | `charm-notify` | P4 | 8 | ⬜ |
-| `charm-test/{charmtest,keys,assert,snapshot}.go` | `crates/charm-test/src/{lib,keys,assert,snapshot}.rs` | `charm-test` | P5 | 20 | ⬜ |
-| `charm-devtools/{devtools,inspector}.go` | `crates/charm-devtools/src/{lib,inspector}.rs` | `charm-devtools` | P5 | 10 | ⬜ |
-| `charm-table-cli/main.go` | `crates/charm-table-cli/src/{main,parse,render}.rs` | `charm-table-cli` | P6 | 15 | ⬜ |
-| — | `crates/charm-core/src/lib.rs` | `charm-core` | P0 | 15 | ⬜ |
+| `charm-color/color.go` | `crates/charm-color/src/lib.rs` | `charm-color` | P1 | 12 | ✅ |
+| `charm-themes/{theme,themes,lipgloss}.go` | `crates/charm-themes/src/{theme,themes,lipgloss}.rs` | `charm-themes` | P1 | 6 | ✅ |
+| `charm-spinner/spinner.go` | `crates/charm-spinner/src/lib.rs` | `charm-spinner` | P1 | 30+30 | ✅ |
+| `charm-banner/banner.go` | `crates/charm-banner/src/{lib,fonts}.rs` | `charm-banner` | P1 | 10 | ✅ |
+| `charm-palette/palette.go` | `crates/charm-palette/src/lib.rs` | `charm-palette` | P1 | 6 | ✅ |
+| `charm-layout/{layout,grid}.go` | `crates/charm-layout/src/{flex,grid}.rs` | `charm-layout` | P2 | 12 | ✅ |
+| `charm-nav/{tabs,sidebar,breadcrumb}.go` | `crates/charm-nav/src/{tabs,sidebar,breadcrumb}.rs` | `charm-nav` | P2 | 12 | ✅ |
+| `charm-charts/{sparkline,barchart,progress}.go` | `crates/charm-charts/src/{sparkline,barchart,progress}.rs` | `charm-charts` | P2 | 12 | ✅ |
+| `charm-diff/{diff,styles}.go` | `crates/charm-diff/src/{lib,styles}.rs` | `charm-diff` | P3 | 15 | ✅ |
+| `charm-dialog/dialog.go` | `crates/charm-dialog/src/lib.rs` | `charm-dialog` | P3 | 12 | ✅ |
+| `charm-toast/toast.go` | `crates/charm-toast/src/lib.rs` | `charm-toast` | P3 | 16 | ✅ |
+| `charm-wizard/{wizard,progress}.go` | `crates/charm-wizard/src/{wizard,progress}.rs` | `charm-wizard` | P4 | 12 | ✅ |
+| `charm-i18n/i18n.go` | `crates/charm-i18n/src/lib.rs` | `charm-i18n` | P4 | 20 | ✅ |
+| `charm-form/{form,generate}.go` | `crates/charm-form/src/{lib,spec}.rs` | `charm-form` | P4 | 12 | ✅ |
+| `charm-notify/notify*.go` | `crates/charm-notify/src/{lib,platform/*}.rs` | `charm-notify` | P4 | 8 | ✅ |
+| `charm-test/{charmtest,keys,assert,snapshot}.go` | `crates/charm-test/src/{lib,keys,assert,snapshot}.rs` | `charm-test` | P5 | 20 | ✅ |
+| `charm-devtools/{devtools,inspector}.go` | `crates/charm-devtools/src/{lib,inspector}.rs` | `charm-devtools` | P5 | 10 | ✅ |
+| `charm-table-cli/main.go` | `crates/charm-table-cli/src/{main,parse,render}.rs` | `charm-table-cli` | P6 | 15 | ✅ |
+| — | `crates/charm-core/src/lib.rs` | `charm-core` | P0 | 15 | ✅ |
 
 ---
 
