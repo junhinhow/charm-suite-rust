@@ -73,8 +73,16 @@ fn run_charm(args: &[&str], stdin: &str) -> Output {
         .spawn()
         .expect("falha ao iniciar charm-table");
     if let Some(mut pipe) = child.stdin.take() {
-        pipe.write_all(stdin.as_bytes())
-            .expect("falha ao escrever no stdin");
+        if let Err(error) = pipe.write_all(stdin.as_bytes()) {
+            // O filho pode encerrar antes de ler o stdin (por exemplo, quando o
+            // `clap` rejeita um argumento invalido). Nesse caso o pipe quebra
+            // com `BrokenPipe`, o que e esperado e nao deve falhar o teste.
+            assert_eq!(
+                error.kind(),
+                std::io::ErrorKind::BrokenPipe,
+                "falha ao escrever no stdin: {error}"
+            );
+        }
     }
     child
         .wait_with_output()
