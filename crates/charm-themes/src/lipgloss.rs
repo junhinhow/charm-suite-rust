@@ -99,8 +99,18 @@ impl LipglossStyles {
 mod tests {
     use crate::themes;
 
+    /// Forca o perfil truecolor.
+    ///
+    /// O `lipgloss` guarda o token de cor no momento em que o estilo e
+    /// construido, e o token depende do perfil detectado. Em ambientes sem
+    /// TTY (CI) o perfil e `NoColor` e todos os tokens viram string vazia.
+    fn force_truecolor() {
+        lipgloss::renderer::set_color_profile(lipgloss::renderer::ColorProfileKind::TrueColor);
+    }
+
     #[test]
     fn base_styles_use_the_expected_colors() {
+        force_truecolor();
         let theme = themes::dracula();
         let styles = theme.lipgloss();
 
@@ -126,6 +136,7 @@ mod tests {
 
     #[test]
     fn semantic_styles_use_the_expected_colors() {
+        force_truecolor();
         let theme = themes::tokyo_night();
         let styles = theme.lipgloss();
 
@@ -146,6 +157,7 @@ mod tests {
 
     #[test]
     fn component_styles_use_the_expected_colors() {
+        force_truecolor();
         let theme = themes::nord();
         let styles = theme.lipgloss();
 

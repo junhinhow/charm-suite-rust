@@ -131,6 +131,11 @@ fn color_of(theme: &Theme, field: &str) -> Rgb {
 
 #[test]
 fn lipgloss_styles_are_coherent_with_the_theme() {
+    // Sem TTY (CI) o `lipgloss` usa o perfil `NoColor` e os tokens de cor
+    // viram string vazia. Forcamos truecolor para que a comparacao entre o
+    // token guardado no estilo e a cor do tema seja significativa.
+    lipgloss::renderer::set_color_profile(lipgloss::renderer::ColorProfileKind::TrueColor);
+
     for theme in themes::themes().values() {
         let styles = theme.lipgloss();
 

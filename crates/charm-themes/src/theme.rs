@@ -167,6 +167,10 @@ mod tests {
 
     #[test]
     fn lipgloss_styles_are_derived_from_the_theme() {
+        // Ver `force_truecolor` em `lipgloss.rs`: sem TTY o perfil e NoColor
+        // e os tokens de cor viram string vazia.
+        lipgloss::renderer::set_color_profile(lipgloss::renderer::ColorProfileKind::TrueColor);
+
         let theme = themes::nord();
         let styles = theme.lipgloss();
         assert_eq!(
