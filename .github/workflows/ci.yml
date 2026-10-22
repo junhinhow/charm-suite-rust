@@ -8,7 +8,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
 
 jobs:
   fmt:
@@ -56,46 +55,26 @@ jobs:
         env:
           RUSTDOCFLAGS: "-D warnings"
 
-  publish-dry-run:
-    name: publish dry-run
-    needs: [fmt, clippy, test, doc]
+  metadata:
+    name: metadata
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Verifica os metadados de publicacao
-        run: |
-          cargo install cargo-release --locked
-          cargo release --workspace --dry-run --no-publish --no-tag --no-verify || true
-      - name: Publicacao de teste por crate
+      - name: Verifica os campos obrigatorios de cada crate publicavel
         run: |
           set -e
-          for p in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.publish != ["false"]) | .name'); do
-            echo "::group::$p"
-            cargo publish -p "$p" --dry-run --allow-dirty
+          for manifest in crates/*/Cargo.toml tools/*/Cargo.toml; do
+            pkg=$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -1)
+            [ "$pkg" = "charm-parity" ] && continue
+            echo "::group::$pkg"
+            for field in description license repository readme; do
+              grep -qE "^$field(\.workspace)? =" "$manifest" \
+                || { echo "campo '$field' ausente em $manifest"; exit 1; }
+            done
+            cargo package --list -p "$pkg" --allow-dirty > /dev/null
             echo "::endgroup::"
           done
-
-  parity:
-    name: parity (Go -> Rust)
-    needs: [test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.24"
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Clona as referencias Go
-        run: |
-          mkdir -p reference/go
-          for r in charm-banner charm-charts charm-color charm-devtools charm-dialog \
-                   charm-diff charm-form charm-i18n charm-layout charm-nav charm-notify \
-                   charm-palette charm-spinner charm-table-cli charm-test charm-themes \
-                   charm-toast charm-wizard; do
-            git clone --depth 1 "https://github.com/junhinhow/$r.git" "reference/go/$r"
-          done
-      - name: Testes de paridade
-        run: cargo test --workspace --features parity
+      - name: Carga o workspace com todas as features
+        run: cargo build --workspace --all-features

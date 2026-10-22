@@ -7,6 +7,9 @@
 
 Port Rust de [`junhinhow/charm-suite`](https://github.com/junhinhow/charm-suite) (Go).
 
+- **Forgejo (origem):** <https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust>
+- **GitHub (mirror):** <https://github.com/junhinhow/charm-suite-rust>
+
 ## As bibliotecas / The Libraries
 
 | Library | Description (EN) | Descricao (PT) |
