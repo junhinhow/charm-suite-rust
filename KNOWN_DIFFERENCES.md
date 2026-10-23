@@ -75,6 +75,8 @@ Legenda da coluna **Impacto**: o que muda para quem usa a biblioteca ou a CLI.
 | `charm-i18n` | `detect_locale` mantém a capitalização de idioma e região | **Sem diferença de comportamento**: é o mesmo do Go | Nenhum |
 | `charm-i18n` | Argumentos de `tf` são `serde_json::Value`. JSON não separa `int` de `int64` nem `float32` de `float64`, e não representa `NaN` nem infinito | JSON é o tipo de valor escolhido para o port | Tipos numéricos não são distinguidos; `NaN` é impossível |
 | `charm-i18n` | `{}` e escapes `{{` / `}}` são extensões. O Go imprime `{{` literalmente | Ergonomia para quem usa placeholders do Rust | Templates com chaves duplas renderizam diferente do Go |
+| `charm-input` | `View` retorna `String` em vez de `tea.View`; o campo `.Content` não existe | Idioma Rust | Use `.view()` diretamente |
+| `charm-input` | `SetFormat` recebe layout no estilo Go e converte os tokens comuns para chrono | Compatibilidade com API Go | Layouts Go arbitrários podem não ser totalmente suportados |
 | `charm-i18n` | Diretivas não suportadas (`%c`, `%T`, `%g`, `%p`, largura `*`) saem como `%!verbo(...)` | Não implementadas no formatador mínimo | Não são formatadas |
 | `charm-i18n` | Diagnóstico de tipo incompatível não aplica a precisão (o Go imprime `%!f(int=03)` para `%.2f` com `3`) | Simplificação do formatador | Texto de diagnóstico diferente |
 | `charm-form` | O renderizador usa `charmed-bubbletea` 0.2.4 e marcadores simples, não Bubble Tea v2 + Lip Gloss v2; o runtime Rust consome Ctrl+C antes de chamar `Model::update`, então o runner trata um modelo não concluído como cancelado | A API disponível no workspace tem contrato Elm diferente do Bubble Tea Go; a saída de teclado permanece portável | Fluxo e teclas equivalentes, mas estilo visual diferente; Ctrl+C reportado como cancelamento pelo runner |
@@ -124,3 +126,11 @@ Diferenças que valem para vários crates:
 - As diferenças acima são **deliberadas e documentadas**. Qualquer divergência
   que não esteja aqui é um bug e deve ser reportada no Forgejo.
 - Para regenerar golden files, veja [CONTRIBUTING.md](CONTRIBUTING.md#golden-files-paridade-com-o-go).
+
+
+## charm-panes
+
+| Diferenca | Motivo | Impacto |
+|---|---|---|
+| Layout::view_model devolve uma struct View com apenas o campo content | O port Rust do Bubble Tea nao expoe metadados adicionais do terminal nessa struct | Apenas o conteudo renderizado e usado; nenhuma diferenca visual |
+

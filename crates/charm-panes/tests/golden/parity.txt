@@ -1,0 +1,29 @@
+== horizontal ==
+▌ Lado    │  Editor 
+esq       │dir      
+          │         
+          │         
+sizes=[10 9] visible=2
+== vertical ==
+▌ Topo              
+linha               
+                    
+                    
+                    
+────────────────────
+  Base              
+fundo               
+                    
+                    
+sizes=[5 4] visible=2
+== degradation ==
+▌  │+3 
+   │   
+   │   
+   │   
+   │   
+   │   
+   │   
+   │   
+   │   
+   │   

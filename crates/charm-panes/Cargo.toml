@@ -1,0 +1,26 @@
+[package]
+name = "charm-panes"
+description = "Paineis redimensionaveis e acionados por teclado para interfaces de terminal."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["panes", "tui", "terminal", "layout", "bubbletea"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+charm-core.workspace = true
+unicode-width.workspace = true
+charmed-bubbletea.workspace = true
+lipgloss.workspace = true
+
+[dev-dependencies]
+charm-parity = { path = "../../tools/parity" }
+
+[lints]
+workspace = true
+

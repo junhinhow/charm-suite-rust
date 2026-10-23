@@ -1,0 +1,11 @@
+ticks:
+12:00:01.000
+12:00:02.000
+entries:
+config
+logs
+snapshot: tema: escuro
+clipboard: segundo
+history: [primeiro segundo]
+http: status=200 body=olá header=sim
+requests: 1
