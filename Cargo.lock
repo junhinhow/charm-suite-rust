@@ -223,6 +223,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "charm-keys"
+version = "0.1.0"
+dependencies = [
+ "charm-parity",
+ "charmed-bubbletea",
+ "lipgloss",
+]
+
+[[package]]
 name = "charm-layout"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,23 @@
+[package]
+name = "charm-keys"
+description = "Context-scoped keybindings for Bubble Tea TUIs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["keys", "keybindings", "tui", "terminal", "charm"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+charmed-bubbletea.workspace = true
+lipgloss.workspace = true
+
+[dev-dependencies]
+charm-parity.workspace = true
+
+[lints]
+workspace = true
