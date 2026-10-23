@@ -1,0 +1,28 @@
+[package]
+name = "charm-config"
+description = "Layered configuration loader, schema validation, and Bubble Tea editor."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["config", "configuration", "yaml", "json", "bubbletea"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+charmed-bubbletea.workspace = true
+lipgloss.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+unicode-width.workspace = true
+
+[dev-dependencies]
+charm-parity.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

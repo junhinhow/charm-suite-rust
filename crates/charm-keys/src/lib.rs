@@ -1,4 +1,4 @@
-﻿//! Context-scoped keybindings for Bubble Tea TUIs.
+//! Context-scoped keybindings for Bubble Tea TUIs.
 //!
 //! # Examples
 //!
@@ -76,7 +76,9 @@ impl Context {
                     continue;
                 }
                 keys.push(raw.clone());
-                ctx.index.entry(normalized).or_insert_with(|| binding.action.clone());
+                ctx.index
+                    .entry(normalized)
+                    .or_insert_with(|| binding.action.clone());
             }
             if keys.is_empty() {
                 continue;
@@ -252,7 +254,7 @@ impl Resolver {
         // Collect effective bindings: top-down, first definition wins.
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut entries: Vec<(String, String)> = Vec::new(); // (keys, help)
-        // walk from top context down to global
+                                                             // walk from top context down to global
         let mut contexts: Vec<&Context> = Vec::new();
         for name in self.stack.iter().rev() {
             if let Some(ctx) = self.contexts.get(name) {
@@ -337,4 +339,3 @@ fn collect_conflicts(ctx: &Context, out: &mut Vec<Conflict>) {
         }
     }
 }
-

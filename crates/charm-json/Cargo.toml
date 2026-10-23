@@ -1,0 +1,26 @@
+[package]
+name = "charm-json"
+description = "Interactive JSON and YAML tree explorer for Bubble Tea."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["json", "yaml", "tree", "terminal", "tui"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+charmed-bubbletea.workspace = true
+lipgloss.workspace = true
+serde_json = { workspace = true, features = ["preserve_order", "arbitrary_precision"] }
+serde_yaml_ng.workspace = true
+unicode-width.workspace = true
+
+[dev-dependencies]
+charm-parity.workspace = true
+
+[lints]
+workspace = true

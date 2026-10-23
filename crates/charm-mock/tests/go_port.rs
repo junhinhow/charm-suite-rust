@@ -1,10 +1,24 @@
+#![allow(
+    clippy::all,
+    clippy::unreadable_literal,
+    clippy::format_in_format_args,
+    clippy::len_zero,
+    clippy::manual_string_new,
+    clippy::assertions_on_constants,
+    clippy::assert_is_empty,
+    clippy::uninlined_format_args,
+    missing_docs,
+    unused,
+    unused_must_use
+)]
+
 use std::io;
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use charm_mock::{
-    Clipboard, FakeClock, MemFS, HttpMock, OP_READ, OP_WRITE, OP_REMOVE, OP_STAT, OP_READDIR,
+    Clipboard, FakeClock, HttpMock, MemFS, OP_READ, OP_READDIR, OP_REMOVE, OP_STAT, OP_WRITE,
 };
 use serial_test::serial;
 
@@ -97,7 +111,10 @@ fn clipboard_le_escreve() {
     c.write("segundo").unwrap();
     assert_eq!(c.contents(), "segundo");
     assert_eq!(c.read().unwrap(), "segundo");
-    assert_eq!(c.history(), vec!["primeiro".to_string(), "segundo".to_string()]);
+    assert_eq!(
+        c.history(),
+        vec!["primeiro".to_string(), "segundo".to_string()]
+    );
 }
 
 #[test]
@@ -154,7 +171,10 @@ fn memfs_seed_leitura() {
     let fs = MemFS::new();
     assert!(fs.read_file("ausente.txt").is_err());
     // errors.Is NotFound
-    assert_eq!(fs.read_file("ausente.txt").unwrap_err().kind(), io::ErrorKind::NotFound);
+    assert_eq!(
+        fs.read_file("ausente.txt").unwrap_err().kind(),
+        io::ErrorKind::NotFound
+    );
     fs.seed("config/app.yaml", b"tema: escuro");
     let data = fs.read_file("config/app.yaml").unwrap();
     assert_eq!(data, b"tema: escuro");
@@ -212,7 +232,10 @@ fn memfs_readdir() {
     assert_eq!(entries[0].name(), "app.yaml");
     assert_eq!(entries[1].name(), "tema.json");
     assert!(fs.read_dir("raiz.txt").is_err());
-    assert_eq!(fs.read_dir("nao-existe").unwrap_err().kind(), io::ErrorKind::NotFound);
+    assert_eq!(
+        fs.read_dir("nao-existe").unwrap_err().kind(),
+        io::ErrorKind::NotFound
+    );
 }
 
 #[test]
@@ -227,7 +250,10 @@ fn memfs_stat() {
     assert_eq!(info.size(), 4);
     assert!(info.mod_time() != SystemTime::UNIX_EPOCH); // not zero-ish
     assert!(info.sys().is_none());
-    assert_eq!(fs.stat("a/nao-existe").unwrap_err().kind(), io::ErrorKind::NotFound);
+    assert_eq!(
+        fs.stat("a/nao-existe").unwrap_err().kind(),
+        io::ErrorKind::NotFound
+    );
 }
 
 #[test]
@@ -236,12 +262,21 @@ fn memfs_remove() {
         .seed("config/app.yaml", b"a")
         .seed("vazio.txt", b"b");
     fs.remove("vazio.txt").unwrap();
-    assert_eq!(fs.read_file("vazio.txt").unwrap_err().kind(), io::ErrorKind::NotFound);
-    assert_eq!(fs.remove("vazio.txt").unwrap_err().kind(), io::ErrorKind::NotFound);
+    assert_eq!(
+        fs.read_file("vazio.txt").unwrap_err().kind(),
+        io::ErrorKind::NotFound
+    );
+    assert_eq!(
+        fs.remove("vazio.txt").unwrap_err().kind(),
+        io::ErrorKind::NotFound
+    );
     assert!(fs.remove("config").is_err());
     fs.remove("config/app.yaml").unwrap();
     fs.remove("config").unwrap();
-    assert_eq!(fs.stat("config").unwrap_err().kind(), io::ErrorKind::NotFound);
+    assert_eq!(
+        fs.stat("config").unwrap_err().kind(),
+        io::ErrorKind::NotFound
+    );
     assert!(fs.remove(".").is_err());
 }
 
@@ -258,28 +293,52 @@ fn memfs_fail_on() {
     let fs2 = fs.seed("b.txt", b"y");
     assert_eq!(fs2.read_file("b.txt").unwrap(), b"y");
     // write
-    fs.fail_on(OP_WRITE, "a.txt", Some(io::Error::new(io::ErrorKind::Other, "boom")));
+    fs.fail_on(
+        OP_WRITE,
+        "a.txt",
+        Some(io::Error::new(io::ErrorKind::Other, "boom")),
+    );
     assert!(fs.write_file("a.txt", b"y", 0o644).is_err());
     assert_eq!(fs.snapshot()["a.txt"], b"x");
     // remove
-    fs.fail_on(OP_REMOVE, "a.txt", Some(io::Error::new(io::ErrorKind::Other, "boom")));
+    fs.fail_on(
+        OP_REMOVE,
+        "a.txt",
+        Some(io::Error::new(io::ErrorKind::Other, "boom")),
+    );
     assert!(fs.remove("a.txt").is_err());
     // stat
-    fs.fail_on(OP_STAT, "a.txt", Some(io::Error::new(io::ErrorKind::Other, "boom")));
+    fs.fail_on(
+        OP_STAT,
+        "a.txt",
+        Some(io::Error::new(io::ErrorKind::Other, "boom")),
+    );
     assert!(fs.stat("a.txt").is_err());
     // readdir
-    fs.fail_on(OP_READDIR, ".", Some(io::Error::new(io::ErrorKind::Other, "boom")));
+    fs.fail_on(
+        OP_READDIR,
+        ".",
+        Some(io::Error::new(io::ErrorKind::Other, "boom")),
+    );
     assert!(fs.read_dir(".").is_err());
     // nil err
     fs.fail_on(OP_READ, "a.txt", None);
     assert!(fs.read_file("a.txt").is_err());
     // unknown op no effect
     let outro = MemFS::new().seed("a.txt", b"x");
-    outro.fail_on("operacao-inexistente", "a.txt", Some(io::Error::new(io::ErrorKind::Other, "boom")));
+    outro.fail_on(
+        "operacao-inexistente",
+        "a.txt",
+        Some(io::Error::new(io::ErrorKind::Other, "boom")),
+    );
     assert!(outro.read_file("a.txt").is_ok());
     // alias
     let alias = MemFS::new().seed("a.txt", b"x");
-    alias.fail_on("ReadFile", "a.txt", Some(io::Error::new(io::ErrorKind::Other, "boom")));
+    alias.fail_on(
+        "ReadFile",
+        "a.txt",
+        Some(io::Error::new(io::ErrorKind::Other, "boom")),
+    );
     assert!(alias.read_file("a.txt").is_err());
 }
 
@@ -349,7 +408,10 @@ fn http_handle_get() {
     let h = HttpMock::new();
     assert!(h.url().starts_with("http://"));
     let mut headers = std::collections::BTreeMap::new();
-    headers.insert("Content-Type".to_string(), "text/plain; charset=utf-8".to_string());
+    headers.insert(
+        "Content-Type".to_string(),
+        "text/plain; charset=utf-8".to_string(),
+    );
     headers.insert("X-Teste".to_string(), "sim".to_string());
     h.handle("GET", "/hello", 200, "olá", Some(headers));
     let client = h.client();
@@ -360,7 +422,10 @@ fn http_handle_get() {
     assert_eq!(resp.status_code, 200);
     assert_eq!(resp.body, "olá");
     assert_eq!(resp.header("X-Teste").unwrap(), "sim");
-    assert_eq!(resp.header("Content-Type").unwrap(), "text/plain; charset=utf-8");
+    assert_eq!(
+        resp.header("Content-Type").unwrap(),
+        "text/plain; charset=utf-8"
+    );
     let reqs = h.requests();
     assert_eq!(reqs.len(), 1);
     assert_eq!(reqs[0].method, "GET");
@@ -544,7 +609,9 @@ struct FakeCleanuper {
 
 impl FakeCleanuper {
     fn new() -> Self {
-        Self { cleanups: Vec::new() }
+        Self {
+            cleanups: Vec::new(),
+        }
     }
     fn run(&mut self) {
         while let Some(cb) = self.cleanups.pop() {

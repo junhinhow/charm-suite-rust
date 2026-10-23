@@ -1,0 +1,8 @@
+server:
+  host: db.internal
+  port: 8081
+  tls: true
+timeout: 1m30s
+hosts:
+  - api.internal
+  - worker.internal

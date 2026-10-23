@@ -1,4 +1,4 @@
-﻿//! Key normalization (mirrors the Go `normalize.go`).
+//! Key normalization (mirrors the Go `normalize.go`).
 
 use std::collections::HashSet;
 
@@ -148,8 +148,21 @@ fn canonical_final(s: &str, has_mods: bool) -> String {
         return alias.to_owned();
     }
     let named = [
-        "esc", "enter", "tab", "backspace", "delete", "insert", "home", "end", "pgup", "pgdown",
-        "space", "up", "down", "left", "right",
+        "esc",
+        "enter",
+        "tab",
+        "backspace",
+        "delete",
+        "insert",
+        "home",
+        "end",
+        "pgup",
+        "pgdown",
+        "space",
+        "up",
+        "down",
+        "left",
+        "right",
     ];
     if named.contains(&lower.as_str()) {
         return lower;
@@ -177,4 +190,3 @@ fn canonical_final(s: &str, has_mods: bool) -> String {
 
     lower
 }
-

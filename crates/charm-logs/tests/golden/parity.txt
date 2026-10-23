@@ -1,0 +1,8 @@
+== view ==
+[1;38;2;156;163;175m2 entradas · debug · follow on · filtro: -[0m
+[38;2;63;63;70m────────────────────────────────────────────────────────[0m
+  12:00:00 INF [api] worker ready
+› 12:00:01 ERR request failed
+== export ==
+2026-10-22T12:00:00Z INFO [api] worker ready
+2026-10-22T12:00:01Z ERROR request failed

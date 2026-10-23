@@ -1,0 +1,4 @@
+charm-config  [valores] docs
+> host = localhost  Hostname
+  port = 8080  TCP port
+↑/↓ navegar · enter editar · tab docs · s salva…

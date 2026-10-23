@@ -1,9 +1,15 @@
 //! Parity tests against the Go original.
+#![allow(
+    clippy::all,
+    clippy::unreadable_literal,
+    clippy::uninlined_format_args,
+    missing_docs
+)]
 
 use std::fmt::Write as _;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use charm_mock::{FakeClock, MemFS, Clipboard, HttpMock};
+use charm_mock::{Clipboard, FakeClock, HttpMock, MemFS};
 use charm_parity::assert_golden;
 
 fn format_time(t: SystemTime) -> String {
@@ -70,11 +76,17 @@ fn build_report() -> String {
     let _ = writeln!(out, "history: [{}]", clip.history().join(" "));
 
     let api = HttpMock::new();
-    api.handle("GET", "/hello", 200, "olá", Some({
-        let mut m = std::collections::BTreeMap::new();
-        m.insert("X-Teste".to_string(), "sim".to_string());
-        m
-    }));
+    api.handle(
+        "GET",
+        "/hello",
+        200,
+        "olá",
+        Some({
+            let mut m = std::collections::BTreeMap::new();
+            m.insert("X-Teste".to_string(), "sim".to_string());
+            m
+        }),
+    );
     let client = api.client();
     let url = format!("{}/hello", api.url());
     let resp = client.get(&url).unwrap();

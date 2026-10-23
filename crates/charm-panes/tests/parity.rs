@@ -79,4 +79,3 @@ fn parity() {
     let report = build_report();
     assert_golden("parity", &report);
 }
-
