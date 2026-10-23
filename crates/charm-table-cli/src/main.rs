@@ -1,7 +1,7 @@
 //! `charm-table`: renders CSV, TSV, JSON and JSON Lines as styled terminal tables.
 //!
 //! This is a port of the Go `charm-table-cli` command. The table is written to
-//! stdout; errors go to stderr with exit code 1.
+//! stdout; errors go to stderr, prefixed with `Erro:`, with exit code 1.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -10,14 +10,14 @@ mod parse;
 mod render;
 
 use std::fs::File;
-use std::io::{self, IsTerminal, Read};
+use std::io::{self, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
 use thiserror::Error;
 
-use crate::render::{BorderStyle, RenderOptions};
+use crate::render::{BorderStyle, RenderError, RenderOptions};
 
 /// Command-line options. The flags mirror the Go `flag` set.
 #[derive(Debug, Parser)]
@@ -39,7 +39,7 @@ struct Cli {
     #[arg(long = "no-header", overrides_with = "header")]
     no_header: bool,
 
-    /// Largura maxima da tabela (0 = sem limite).
+    /// Largura maxima da tabela, bordas incluidas (0 = sem limite).
     #[arg(
         long,
         value_name = "N",
@@ -71,29 +71,41 @@ impl Cli {
     }
 }
 
-/// Errors reported on stderr. The messages match the Go original.
+/// Errors reported on stderr. The messages follow the Go original.
 #[derive(Debug, Error)]
 enum AppError {
+    /// The input file could not be opened.
+    #[error("nao foi possivel abrir o arquivo \"{path}\": {source}")]
+    OpenFile {
+        /// Path that was requested.
+        path: String,
+        /// Underlying I/O error.
+        #[source]
+        source: io::Error,
+    },
     /// The input could not be read.
-    #[error("Erro ao ler entrada: {0}")]
-    Input(#[source] io::Error),
-    /// The input has no bytes at all.
-    #[error("Erro: entrada vazia")]
-    Empty,
+    #[error("nao foi possivel ler a entrada: {0}")]
+    Read(#[source] io::Error),
+    /// Nothing was piped and no file was given.
+    #[error("nenhuma entrada fornecida — use pipe ou passe um arquivo como argumento")]
+    NoInput,
     /// The input could not be parsed.
-    #[error("Erro ao processar dados: {0}")]
-    Parse(#[source] parse::ParseError),
+    #[error(transparent)]
+    Parse(#[from] parse::ParseError),
+    /// The table could not be drawn.
+    #[error(transparent)]
+    Render(#[from] RenderError),
+    /// The table could not be written to stdout.
+    #[error("nao foi possivel escrever a tabela na saida: {0}")]
+    Write(#[source] io::Error),
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    match run(&cli) {
-        Ok(output) => {
-            println!("{output}");
-            ExitCode::SUCCESS
-        }
+    match run(&cli).and_then(|output| write_output(&output)) {
+        Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            eprintln!("{err}");
+            eprintln!("Erro: {err}");
             ExitCode::FAILURE
         }
     }
@@ -101,42 +113,43 @@ fn main() -> ExitCode {
 
 /// Reads the input, parses it and renders the table.
 fn run(cli: &Cli) -> Result<String, AppError> {
-    let data = read_input(cli.file.as_deref()).map_err(AppError::Input)?;
-    if data.is_empty() {
-        return Err(AppError::Empty);
-    }
-
-    let table = parse::detect_and_parse(&data, cli.use_header()).map_err(AppError::Parse)?;
+    let data = read_input(cli.file.as_deref())?;
+    let table = parse::detect_and_parse(&data, cli.use_header())?;
     let options = RenderOptions {
         style: cli.style,
         max_width: cli.max_width(),
         color: cli.color.clone(),
     };
-    Ok(render::render_table(&table.headers, &table.rows, &options))
+    Ok(render::render_table(&table.headers, &table.rows, &options)?)
+}
+
+/// Writes the rendered table, followed by a newline, to stdout.
+fn write_output(output: &str) -> Result<(), AppError> {
+    let mut stdout = io::stdout().lock();
+    writeln!(stdout, "{output}").map_err(AppError::Write)
 }
 
 /// Reads the whole input from `file`, or from stdin when no file is given.
 ///
 /// Invalid UTF-8 is replaced with U+FFFD. Reading from an interactive terminal
 /// is refused, as in the Go original.
-fn read_input(file: Option<&Path>) -> io::Result<String> {
+fn read_input(file: Option<&Path>) -> Result<String, AppError> {
     let mut bytes = Vec::new();
     if let Some(path) = file {
-        let mut handle = File::open(path).map_err(|err| {
-            io::Error::new(
-                err.kind(),
-                format!("nao foi possivel abrir arquivo {}: {err}", path.display()),
-            )
+        let mut handle = File::open(path).map_err(|source| AppError::OpenFile {
+            path: path.display().to_string(),
+            source,
         })?;
-        handle.read_to_end(&mut bytes)?;
+        handle.read_to_end(&mut bytes).map_err(AppError::Read)?;
     } else {
         let stdin = io::stdin();
         if stdin.is_terminal() {
-            return Err(io::Error::other(
-                "nenhuma entrada fornecida — use pipe ou passe um arquivo como argumento",
-            ));
+            return Err(AppError::NoInput);
         }
-        stdin.lock().read_to_end(&mut bytes)?;
+        stdin
+            .lock()
+            .read_to_end(&mut bytes)
+            .map_err(AppError::Read)?;
     }
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }

@@ -60,7 +60,9 @@ pub enum Error {
     #[error("desktop notifications are not supported on this platform")]
     UnsupportedPlatform,
     /// The external program required on this platform is not installed or not in `PATH`.
-    #[error("external program `{binary}` was not found in PATH")]
+    ///
+    /// For `notify-send` the message also says how to install `libnotify`.
+    #[error("external program `{binary}` was not found in PATH{}", install_hint(.binary))]
     BinaryNotFound {
         /// Name of the missing program.
         binary: String,
@@ -100,6 +102,15 @@ fn describe_stderr(stderr: &str) -> String {
         ": no error output".to_owned()
     } else {
         format!(": {stderr}")
+    }
+}
+
+/// Installation hint appended to [`Error::BinaryNotFound`] for known programs.
+fn install_hint(binary: &str) -> &'static str {
+    if binary == "notify-send" {
+        ": install libnotify, for example with `apt install libnotify-bin`"
+    } else {
+        ""
     }
 }
 

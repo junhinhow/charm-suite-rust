@@ -115,6 +115,51 @@ impl Breadcrumb {
         &self.items
     }
 
+    /// Appends items to the end of the trail.
+    ///
+    /// Returns the index of the first item added, or `None` when `items` is
+    /// empty (the Go original returns `-1`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_nav::Breadcrumb;
+    ///
+    /// let mut breadcrumb = Breadcrumb::new(&["Home"]);
+    /// assert_eq!(breadcrumb.add(&["Config", "Profile"]), Some(1));
+    /// assert_eq!(breadcrumb.items().len(), 3);
+    /// ```
+    pub fn add(&mut self, items: &[&str]) -> Option<usize> {
+        if items.is_empty() {
+            return None;
+        }
+        let first = self.items.len();
+        self.items
+            .extend(items.iter().map(|item| (*item).to_string()));
+        Some(first)
+    }
+
+    /// Removes the item at `index` and returns its label.
+    ///
+    /// Returns an empty string when `index` is out of range, as in Go.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_nav::Breadcrumb;
+    ///
+    /// let mut breadcrumb = Breadcrumb::new(&["Home", "Settings", "Profile"]);
+    /// assert_eq!(breadcrumb.remove(1), "Settings");
+    /// assert_eq!(breadcrumb.items(), ["Home".to_string(), "Profile".to_string()]);
+    /// assert_eq!(breadcrumb.remove(9), "");
+    /// ```
+    pub fn remove(&mut self, index: usize) -> String {
+        if index >= self.items.len() {
+            return String::new();
+        }
+        self.items.remove(index)
+    }
+
     /// Renders the styled breadcrumb.
     ///
     /// The last item is the current location and receives the active style. An
@@ -149,54 +194,5 @@ impl Breadcrumb {
             .collect();
 
         parts.join(&self.separator)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use lipgloss::utils::strip_ansi;
-
-    #[test]
-    fn new_uses_the_go_defaults() {
-        let breadcrumb = Breadcrumb::new(&["Home"]);
-        assert_eq!(breadcrumb.separator, " > ");
-    }
-
-    #[test]
-    fn empty_breadcrumb_renders_empty_string() {
-        assert_eq!(Breadcrumb::new(&[]).render(), "");
-    }
-
-    #[test]
-    fn push_appends_to_the_end() {
-        let mut breadcrumb = Breadcrumb::new(&["Home"]);
-        breadcrumb.push("Settings");
-        assert_eq!(
-            breadcrumb.items(),
-            ["Home".to_string(), "Settings".to_string()]
-        );
-    }
-
-    #[test]
-    fn pop_returns_the_removed_item() {
-        let mut breadcrumb = Breadcrumb::new(&["Home", "Settings"]);
-        assert_eq!(breadcrumb.pop(), "Settings");
-        assert_eq!(breadcrumb.pop(), "Home");
-    }
-
-    #[test]
-    fn pop_on_an_empty_breadcrumb_returns_an_empty_string() {
-        let mut breadcrumb = Breadcrumb::new(&[]);
-        assert_eq!(breadcrumb.pop(), "");
-    }
-
-    #[test]
-    fn render_joins_the_items_with_the_separator() {
-        let breadcrumb = Breadcrumb::new(&["Home", "Settings", "Profile"]);
-        assert_eq!(
-            strip_ansi(&breadcrumb.render()),
-            "Home > Settings > Profile"
-        );
     }
 }

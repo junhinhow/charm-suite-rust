@@ -146,6 +146,9 @@ impl Tabs {
 
     /// Returns the labels of the tabs.
     ///
+    /// The slice is borrowed from the bar, so it cannot change its state. The
+    /// Go original returns a copy for the same guarantee.
+    ///
     /// # Examples
     ///
     /// ```
@@ -157,6 +160,65 @@ impl Tabs {
     #[must_use]
     pub fn items(&self) -> &[String] {
         &self.items
+    }
+
+    /// Appends tabs to the end of the bar.
+    ///
+    /// Returns the index of the first tab added, or `None` when `items` is
+    /// empty (the Go original returns `-1`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_nav::Tabs;
+    ///
+    /// let mut tabs = Tabs::new(&["Home"]);
+    /// assert_eq!(tabs.add(&["Settings", "About"]), Some(1));
+    /// assert_eq!(tabs.items().len(), 3);
+    /// assert_eq!(tabs.add(&[]), None);
+    /// ```
+    pub fn add(&mut self, items: &[&str]) -> Option<usize> {
+        if items.is_empty() {
+            return None;
+        }
+        let first = self.items.len();
+        self.items
+            .extend(items.iter().map(|item| (*item).to_string()));
+        Some(first)
+    }
+
+    /// Removes the tab at `index` and returns its label.
+    ///
+    /// Returns an empty string when `index` is out of range, as in Go. The
+    /// active tab follows the removal: removing a tab before the active one
+    /// keeps the same tab active, and removing the active tab selects the
+    /// next one (or the last one, when it was the final tab).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_nav::Tabs;
+    ///
+    /// let mut tabs = Tabs::new(&["Home", "Settings", "About"]);
+    /// tabs.set_active(2);
+    /// assert_eq!(tabs.remove(0), "Home");
+    /// assert_eq!(tabs.active(), 1);
+    /// assert_eq!(tabs.items()[tabs.active()], "About");
+    /// assert_eq!(tabs.remove(9), "");
+    /// ```
+    pub fn remove(&mut self, index: usize) -> String {
+        if index >= self.items.len() {
+            return String::new();
+        }
+        let removed = self.items.remove(index);
+
+        if index < self.active {
+            self.active -= 1;
+        } else if self.active >= self.items.len() && !self.items.is_empty() {
+            self.active = self.items.len() - 1;
+        }
+
+        removed
     }
 
     /// Renders the styled tab bar.
@@ -191,68 +253,5 @@ impl Tabs {
             .collect();
 
         parts.join(&self.separator)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use lipgloss::utils::strip_ansi;
-
-    #[test]
-    fn new_uses_the_go_defaults() {
-        let tabs = Tabs::new(&["Home"]);
-        assert_eq!(tabs.separator, " | ");
-        assert_eq!(tabs.active(), 0);
-    }
-
-    #[test]
-    fn empty_tabs_render_empty_string() {
-        assert_eq!(Tabs::new(&[]).render(), "");
-    }
-
-    #[test]
-    fn set_active_ignores_out_of_range_indexes() {
-        let mut tabs = Tabs::new(&["a", "b"]);
-        tabs.set_active(5);
-        assert_eq!(tabs.active(), 0);
-        tabs.set_active(1);
-        assert_eq!(tabs.active(), 1);
-    }
-
-    #[test]
-    fn next_wraps_around() {
-        let mut tabs = Tabs::new(&["a", "b", "c"]);
-        tabs.next();
-        tabs.next();
-        tabs.next();
-        assert_eq!(tabs.active(), 0);
-    }
-
-    #[test]
-    fn previous_wraps_around() {
-        let mut tabs = Tabs::new(&["a", "b", "c"]);
-        tabs.previous();
-        assert_eq!(tabs.active(), 2);
-    }
-
-    #[test]
-    fn next_and_previous_on_empty_tabs_do_nothing() {
-        let mut tabs = Tabs::new(&[]);
-        tabs.next();
-        tabs.previous();
-        assert_eq!(tabs.active(), 0);
-    }
-
-    #[test]
-    fn render_joins_the_tabs_with_the_separator() {
-        let tabs = Tabs::new(&["Home", "Settings", "About"]);
-        assert_eq!(strip_ansi(&tabs.render()), "Home | Settings | About");
-    }
-
-    #[test]
-    fn items_returns_the_labels() {
-        let tabs = Tabs::new(&["Home", "Settings"]);
-        assert_eq!(tabs.items(), ["Home".to_string(), "Settings".to_string()]);
     }
 }

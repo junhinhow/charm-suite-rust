@@ -2,6 +2,9 @@
 //!
 //! The parity test runs the same matrix as `reference/go/charm-table-cli/cmd/parity`
 //! and compares the transcript with `tests/golden/table.txt`.
+//!
+//! Non-ASCII text is written with `\u{...}` escapes so that both the Rust and the
+//! Go sources carry exactly the same bytes.
 
 use std::fmt::Write as _;
 use std::io::Write as _;
@@ -12,10 +15,10 @@ use charm_parity::assert_golden;
 
 const CSV_SAMPLE: &str = concat!(
     "nome,idade,cidade,descricao\n",
-    "Ana,31,São Paulo,Engenheira de software sênior\n",
+    "Ana,31,S\u{e3}o Paulo,Engenheira de software s\u{ea}nior\n",
     "Bruno,27,Rio de Janeiro,\"Analista, dados\"\n",
     "Carla,45,Belo Horizonte,\n",
-    "Dário,,Curitiba,Gerente de produto com muitas responsabilidades\n",
+    "D\u{e1}rio,,Curitiba,Gerente de produto com muitas responsabilidades\n",
 );
 
 const TSV_SAMPLE: &str = "id\tnome\tnota\n1\tAna\t9.5\n2\tBruno\t7\n3\tCarla\t10\n";
@@ -40,7 +43,15 @@ const JSONL_SAMPLE: &str = concat!(
     "{\"v\": null}\n",
 );
 
-/// Same cases, in the same order, as `matrixCases` in the Go parity program.
+const IRREGULAR_SAMPLE: &str = "a,b,c\n1,2\n3,4,5,6\n";
+
+const UNION_SAMPLE: &str = r#"[{"zebra":1,"alfa":2},{"alfa":4,"novo":5}]"#;
+
+const QUOTED_TAB_SAMPLE: &str = "\"nome\tcom aspas\",idade\nAlice,30\n";
+
+const CJK_SAMPLE: &str = "idioma,valor\n\u{65e5}\u{672c}\u{8a9e},42\n\u{1f389},ok\n";
+
+/// Same cases, in the same order, as `matriz` in the Go parity program.
 const MATRIX: &[(&str, &[&str], &str)] = &[
     ("csv_rounded", &[], CSV_SAMPLE),
     ("csv_thick", &["--style", "thick"], CSV_SAMPLE),
@@ -48,13 +59,17 @@ const MATRIX: &[(&str, &[&str], &str)] = &[
     ("csv_ascii", &["--style", "ascii"], CSV_SAMPLE),
     ("csv_no_header", &["--no-header"], CSV_SAMPLE),
     ("csv_max_width_40", &["--max-width", "40"], CSV_SAMPLE),
-    ("csv_max_width_12", &["--max-width", "12"], CSV_SAMPLE),
+    ("csv_max_width_20", &["--max-width", "20"], CSV_SAMPLE),
     ("csv_color_hex", &["--color", "#ff0000"], CSV_SAMPLE),
     ("tsv_rounded", &[], TSV_SAMPLE),
     ("csv_semicolon_fallback", &[], SEMICOLON_SAMPLE),
     ("csv_single_line_header_quirk", &[], SINGLE_LINE_SAMPLE),
     ("json_array_nested", &[], JSON_ARRAY_SAMPLE),
     ("jsonl_numbers", &[], JSONL_SAMPLE),
+    ("csv_irregular", &[], IRREGULAR_SAMPLE),
+    ("json_union_keys", &[], UNION_SAMPLE),
+    ("csv_quoted_tab", &[], QUOTED_TAB_SAMPLE),
+    ("csv_cjk", &[], CJK_SAMPLE),
 ];
 
 fn run_charm(args: &[&str], stdin: &str) -> Output {
@@ -120,6 +135,15 @@ fn squashed(text: &str) -> String {
         .collect()
 }
 
+/// Display width of every table line. The blank line that follows the table
+/// (the Go output ends with an extra newline) is skipped.
+fn table_widths(text: &str) -> Vec<usize> {
+    text.lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| charm_core::display_width(&plain(line)))
+        .collect()
+}
+
 fn widest_line(text: &str) -> usize {
     text.lines()
         .map(|line| charm_core::display_width(&plain(line)))
@@ -142,7 +166,7 @@ fn border_styles_draw_their_corners() {
         ("rounded", "╭", "╮"),
         ("thick", "┏", "┓"),
         ("double", "╔", "╗"),
-        ("ascii", "┌", "┐"),
+        ("ascii", "+", "+"),
     ];
     for (style, left, right) in cases {
         let out = stdout_of(&["--style", style], CSV_SAMPLE);
@@ -153,13 +177,26 @@ fn border_styles_draw_their_corners() {
 }
 
 #[test]
+fn ascii_style_draws_plain_characters_only() {
+    let out = stdout_of(&["--style", "ascii"], CSV_SAMPLE);
+    assert!(out.contains("+-"), "{out}");
+    assert!(!out.contains('│'), "{out}");
+}
+
+#[test]
 fn every_table_line_has_the_same_width() {
     let out = stdout_of(&[], CSV_SAMPLE);
-    let widths: Vec<usize> = out
-        .lines()
-        .map(|line| charm_core::display_width(&plain(line)))
-        .collect();
+    let widths = table_widths(&out);
     assert!(widths.windows(2).all(|pair| pair[0] == pair[1]), "{out}");
+}
+
+#[test]
+fn cjk_and_emoji_keep_the_table_aligned() {
+    let out = stdout_of(&[], CJK_SAMPLE);
+    let widths = table_widths(&out);
+    assert!(widths.windows(2).all(|pair| pair[0] == pair[1]), "{out}");
+    assert!(out.contains("\u{65e5}\u{672c}\u{8a9e}"), "{out}");
+    assert!(out.contains("\u{1f389}"), "{out}");
 }
 
 #[test]
@@ -179,6 +216,26 @@ fn no_header_generates_column_names() {
 }
 
 #[test]
+fn no_header_applies_to_json_too() {
+    let out = squashed(&stdout_of(&["--no-header"], JSON_ARRAY_SAMPLE));
+    assert!(out.contains("Col1"), "{out}");
+}
+
+#[test]
+fn single_line_csv_keeps_its_real_header() {
+    let out = squashed(&stdout_of(&[], SINGLE_LINE_SAMPLE));
+    assert!(out.contains("nomeidade"), "{out}");
+    assert!(!out.contains("Col1"), "{out}");
+}
+
+#[test]
+fn ragged_csv_rows_are_padded() {
+    let out = stdout_of(&[], IRREGULAR_SAMPLE);
+    let widths = table_widths(&out);
+    assert!(widths.windows(2).all(|pair| pair[0] == pair[1]), "{out}");
+}
+
+#[test]
 fn last_header_flag_wins() {
     let out = squashed(&stdout_of(&["--no-header", "--header"], CSV_SAMPLE));
     assert!(!out.contains("Col1"), "{out}");
@@ -192,6 +249,22 @@ fn max_width_truncates_cells_and_shrinks_table() {
     let limited = stdout_of(&["--max-width", "40"], CSV_SAMPLE);
     assert!(limited.contains("..."), "{limited}");
     assert!(widest_line(&limited) < widest_line(&unlimited));
+}
+
+#[test]
+fn max_width_is_never_exceeded() {
+    for limit in ["20", "30", "40", "60"] {
+        let out = stdout_of(&["--max-width", limit], CSV_SAMPLE);
+        let max: usize = limit.parse().expect("limite numerico");
+        assert!(widest_line(&out) <= max, "limit {limit}: {out}");
+    }
+}
+
+#[test]
+fn impossible_max_width_is_an_error() {
+    let (ok, stderr) = stderr_of(&["--max-width", "8"], CSV_SAMPLE);
+    assert!(!ok);
+    assert!(stderr.starts_with("Erro: largura maxima 8"), "{stderr}");
 }
 
 #[test]
@@ -213,6 +286,12 @@ fn color_hex_and_ansi_index_are_emitted() {
 }
 
 #[test]
+fn json_columns_are_the_union_of_every_record() {
+    let out = squashed(&stdout_of(&[], UNION_SAMPLE));
+    assert!(out.contains("alfazebranovo"), "{out}");
+}
+
+#[test]
 fn reads_input_from_file_argument() {
     let path: PathBuf = [env!("CARGO_TARGET_TMPDIR"), "charm-table-sample.csv"]
         .iter()
@@ -226,7 +305,14 @@ fn reads_input_from_file_argument() {
 fn empty_stdin_is_an_error() {
     let (ok, stderr) = stderr_of(&[], "");
     assert!(!ok);
-    assert_eq!(stderr, "Erro: entrada vazia\n");
+    assert_eq!(stderr, "Erro: entrada vazia: nenhum dado para renderizar\n");
+}
+
+#[test]
+fn whitespace_only_stdin_is_an_error() {
+    let (ok, stderr) = stderr_of(&[], " \n\t \n");
+    assert!(!ok);
+    assert!(stderr.starts_with("Erro: entrada vazia"), "{stderr}");
 }
 
 #[test]
@@ -234,17 +320,17 @@ fn invalid_json_is_an_error() {
     let (ok, stderr) = stderr_of(&[], "[{\"a\":");
     assert!(!ok);
     assert!(
-        stderr.starts_with("Erro ao processar dados: JSON invalido"),
+        stderr.starts_with("Erro: JSON invalido: esperava um array de objetos"),
         "{stderr}"
     );
 }
 
 #[test]
-fn ragged_csv_is_an_error() {
-    let (ok, stderr) = stderr_of(&[], "a,b\n1,2,3\n");
+fn jsonl_error_names_the_line() {
+    let (ok, stderr) = stderr_of(&[], "{\"a\":1}\nnao e json\n");
     assert!(!ok);
     assert!(
-        stderr.starts_with("Erro ao processar dados: erro ao processar dados delimitados"),
+        stderr.starts_with("Erro: JSONL invalido na linha 2"),
         "{stderr}"
     );
 }
@@ -254,7 +340,7 @@ fn missing_file_is_an_error() {
     let (ok, stderr) = stderr_of(&["arquivo-que-nao-existe-charm.csv"], "");
     assert!(!ok);
     assert!(
-        stderr.starts_with("Erro ao ler entrada: nao foi possivel abrir arquivo"),
+        stderr.starts_with("Erro: nao foi possivel abrir o arquivo"),
         "{stderr}"
     );
 }

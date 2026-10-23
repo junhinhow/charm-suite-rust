@@ -66,7 +66,10 @@ fn builder_is_order_independent() {
 fn title_with_line_break_is_rejected() {
     for title in ["linha1\nlinha2", "linha1\rlinha2"] {
         let err = send(title, "mensagem", &NotifyOptions::new()).unwrap_err();
-        assert!(matches!(err, Error::MultilineText { field: "title" }), "{err:?}");
+        assert!(
+            matches!(err, Error::MultilineText { field: "title" }),
+            "{err:?}"
+        );
     }
 }
 
@@ -74,7 +77,10 @@ fn title_with_line_break_is_rejected() {
 fn message_with_line_break_is_rejected() {
     for message in ["linha1\nlinha2", "linha1\rlinha2"] {
         let err = send("titulo", message, &NotifyOptions::new()).unwrap_err();
-        assert!(matches!(err, Error::MultilineText { field: "message" }), "{err:?}");
+        assert!(
+            matches!(err, Error::MultilineText { field: "message" }),
+            "{err:?}"
+        );
     }
 }
 
@@ -190,6 +196,26 @@ fn error_messages_are_clear() {
             binary: "notify-send".to_owned()
         }
         .to_string(),
-        "external program `notify-send` was not found in PATH"
+        "external program `notify-send` was not found in PATH: install libnotify, for example with `apt install libnotify-bin`"
+    );
+}
+
+#[test]
+fn missing_binary_without_a_known_hint_names_only_the_program() {
+    let err = Error::BinaryNotFound {
+        binary: "powershell".to_owned(),
+    };
+    assert_eq!(
+        err.to_string(),
+        "external program `powershell` was not found in PATH"
+    );
+}
+
+#[test]
+fn multiline_error_names_the_rejected_field() {
+    let err = send("titulo", "linha1\r\nlinha2", &NotifyOptions::new()).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "notification message cannot contain line breaks"
     );
 }

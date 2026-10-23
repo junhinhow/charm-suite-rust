@@ -16,38 +16,93 @@ active=2
 === tabs set active valido ===
 [38;2;102;102;102mHome[m | [38;2;102;102;102mSettings[m | [1;4;38;2;125;86;244;4mA[m[1;4;38;2;125;86;244;4mb[m[1;4;38;2;125;86;244;4mo[m[1;4;38;2;125;86;244;4mu[m[1;4;38;2;125;86;244;4mt[m
 active=2
+=== tabs add ===
+add=3
+[38;2;102;102;102mHome[m | [38;2;102;102;102mSettings[m | [1;4;38;2;125;86;244;4mA[m[1;4;38;2;125;86;244;4mb[m[1;4;38;2;125;86;244;4mo[m[1;4;38;2;125;86;244;4mu[m[1;4;38;2;125;86;244;4mt[m | [38;2;102;102;102mAjuda[m | [38;2;102;102;102mContato[m
+items=Home,Settings,About,Ajuda,Contato
+=== tabs add vazio ===
+add=none
+=== tabs remove anterior a ativa ===
+removed=Home
+active=1
+items=Settings,About,Ajuda,Contato
+=== tabs remove invalido ===
+removed=
+items=Settings,About,Ajuda,Contato
+=== tabs remove ultima ativa ===
+removed=Contato
+active=2
+[38;2;102;102;102mSettings[m | [38;2;102;102;102mAbout[m | [1;4;38;2;125;86;244;4mA[m[1;4;38;2;125;86;244;4mj[m[1;4;38;2;125;86;244;4mu[m[1;4;38;2;125;86;244;4md[m[1;4;38;2;125;86;244;4ma[m
 === tabs vazio ===
 
 active=0
 === sidebar padrao ===
- [38;2;102;102;102m    Dashboard[m      
- [1;38;2;125;86;244;48;2;26;26;46m▸ Users[m            
- [38;2;102;102;102m    Settings[m       
- [38;2;102;102;102m    Logs[m           
+[38;2;102;102;102m   Dashboard        [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ Users            [m
+[38;2;102;102;102m   Settings         [m
+[38;2;102;102;102m   Logs             [m
 selected=1
 === sidebar apos next ===
- [38;2;102;102;102m    Dashboard[m      
- [38;2;102;102;102m    Users[m          
- [1;38;2;125;86;244;48;2;26;26;46m▸ Settings[m         
- [38;2;102;102;102m    Logs[m           
+[38;2;102;102;102m   Dashboard        [m
+[38;2;102;102;102m   Users            [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ Settings         [m
+[38;2;102;102;102m   Logs             [m
 selected=2
 === sidebar apos previous ===
- [38;2;102;102;102m    Dashboard[m      
- [1;38;2;125;86;244;48;2;26;26;46m▸ Users[m            
- [38;2;102;102;102m    Settings[m       
- [38;2;102;102;102m    Logs[m           
+[38;2;102;102;102m   Dashboard        [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ Users            [m
+[38;2;102;102;102m   Settings         [m
+[38;2;102;102;102m   Logs             [m
 selected=1
 === sidebar previous no inicio ===
- [38;2;102;102;102m    Dashboard[m      
- [38;2;102;102;102m    Users[m          
- [38;2;102;102;102m    Settings[m       
- [1;38;2;125;86;244;48;2;26;26;46m▸ Logs[m             
+[38;2;102;102;102m   Dashboard        [m
+[38;2;102;102;102m   Users            [m
+[38;2;102;102;102m   Settings         [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ Logs             [m
 selected=3
 === sidebar set selected fora do intervalo ===
 selected=3
 === sidebar largura e cursor customizados ===
- [1;38;2;125;86;244;48;2;26;26;46m> Dashboard[m                  
- [38;2;102;102;102m  Users[m                      
+[1;38;2;125;86;244;48;2;26;26;46m > Dashboard                  [m
+[38;2;102;102;102m   Users                      [m
+=== sidebar truncamento ===
+[38;2;102;102;102m   Dashboar [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ Configur [m
+=== sidebar largura minima ===
+[1;38;2;125;86;244;48;2;26;26;46m [m
+[38;2;102;102;102m [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ [m
+[38;2;102;102;102m   [m
+=== sidebar cursor maior que a area ===
+[1;38;2;125;86;244;48;2;26;26;46m >>> [m
+[38;2;102;102;102m     [m
+=== sidebar cursor vazio ===
+[1;38;2;125;86;244;48;2;26;26;46m Dashboard          [m
+[38;2;102;102;102m Users              [m
+=== sidebar add ===
+add=4
+[38;2;102;102;102m   Dashboard        [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ Users            [m
+[38;2;102;102;102m   Settings         [m
+[38;2;102;102;102m   Logs             [m
+[38;2;102;102;102m   Ajuda            [m
+items=Dashboard,Users,Settings,Logs,Ajuda
+=== sidebar remove anterior ao selecionado ===
+removed=Dashboard
+selected=1
+[38;2;102;102;102m   Users            [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ Settings         [m
+[38;2;102;102;102m   Logs             [m
+[38;2;102;102;102m   Ajuda            [m
+=== sidebar remove o selecionado ===
+removed=Settings
+selected=1
+[38;2;102;102;102m   Users            [m
+[1;38;2;125;86;244;48;2;26;26;46m ▸ Logs             [m
+[38;2;102;102;102m   Ajuda            [m
+=== sidebar remove ultimo selecionado ===
+removed=Ajuda
+selected=1
 === sidebar vazio ===
 
 selected=0
@@ -57,6 +112,12 @@ items=Home,Settings,Profile
 === breadcrumb apos pop ===
 pop=Profile
 [38;2;102;102;102mHome[m > [1;38;2;125;86;244mSettings[m
+=== breadcrumb add ===
+add=2
+[38;2;102;102;102mHome[m > [38;2;102;102;102mSettings[m > [38;2;102;102;102mConfig[m > [1;38;2;125;86;244mPerfil[m
+=== breadcrumb remove ===
+removed=Settings
+items=Home,Config,Perfil
 === breadcrumb pop vazio ===
 pop=
 

@@ -154,6 +154,22 @@ mod tests {
     }
 
     #[test]
+    fn burnt_toast_ignores_timeout_because_it_has_no_expiry_option() {
+        let command = build_command(&sample("Hi", "There"));
+        let script = &args_of(&command)[3];
+        assert!(!script.contains("/TIME"));
+        assert!(!script.contains("Expir"));
+    }
+
+    #[test]
+    fn fallback_ignores_icon_because_msg_has_no_icon_option() {
+        let mut notification = sample("Deploy", "done");
+        notification.icon = "C:/icons/app.ico".to_owned();
+        let command = build_fallback_command(&notification);
+        assert!(!args_of(&command).iter().any(|arg| arg.contains("app.ico")));
+    }
+
+    #[test]
     fn burnt_toast_doubles_quotes_in_icon() {
         let mut notification = sample("T", "M");
         notification.icon = "it's.ico".to_owned();

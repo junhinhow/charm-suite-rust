@@ -4,7 +4,9 @@ use std::fmt::Write as _;
 
 use lipgloss::Style;
 
-use crate::{to_i64, EMPTY_GLYPH, FILL_GLYPH};
+use crate::{EMPTY_GLYPH, FILL_GLYPH};
+
+const MAX_WIDTH: usize = 500;
 
 /// A horizontal progress bar.
 ///
@@ -23,7 +25,7 @@ use crate::{to_i64, EMPTY_GLYPH, FILL_GLYPH};
 pub struct ProgressBar {
     /// The progress ratio, between `0.0` and `1.0`.
     pub value: f64,
-    /// The width of the bar, in characters.
+    /// The width of the bar, in characters (`0..=500`).
     pub width: usize,
     /// The character used for the filled portion.
     pub fill_char: char,
@@ -55,9 +57,8 @@ impl ProgressBar {
     /// assert_eq!(bar.width, 40);
     /// ```
     pub fn new(value: f64) -> Self {
-        let value = value.clamp(0.0, 1.0);
         Self {
-            value,
+            value: value.clamp(0.0, 1.0),
             width: 40,
             fill_char: FILL_GLYPH,
             empty_char: EMPTY_GLYPH,
@@ -70,6 +71,9 @@ impl ProgressBar {
 
     /// Sets the width of the bar, in characters.
     ///
+    /// The width is clamped to the `0..=500` range; a width of `0` renders only
+    /// the label and the percentage.
+    ///
     /// # Examples
     ///
     /// ```
@@ -77,10 +81,11 @@ impl ProgressBar {
     ///
     /// let bar = ProgressBar::new(0.5).width(10);
     /// assert_eq!(bar.width, 10);
+    /// assert_eq!(ProgressBar::new(0.5).width(600).width, 500);
     /// ```
     #[must_use]
     pub fn width(mut self, w: usize) -> Self {
-        self.width = w;
+        self.width = w.min(MAX_WIDTH);
         self
     }
 
@@ -194,16 +199,11 @@ impl ProgressBar {
     /// assert!(ProgressBar::new(0.0).render().ends_with("   0%"));
     /// ```
     pub fn render(&self) -> String {
-        let width = to_i64(self.width);
-        let mut filled = (self.value * self.width as f64) as i64;
-        if filled > width {
-            filled = width;
-        }
-        if filled < 0 {
-            // The Go original panics here (`strings.Repeat` with a negative
-            // count); this port clamps instead.
-            filled = 0;
-        }
+        // The public field may be assigned directly, so the value is clamped
+        // again here. The Go original panics on a negative count instead.
+        let value = self.value.clamp(0.0, 1.0);
+        let width = self.width.min(MAX_WIDTH);
+        let filled = ((value * width as f64) as usize).min(width);
         let empty = width - filled;
 
         let mut result = String::new();
@@ -214,15 +214,15 @@ impl ProgressBar {
         result.push_str(
             &self
                 .fill_style
-                .render(&self.fill_char.to_string().repeat(filled as usize)),
+                .render(&self.fill_char.to_string().repeat(filled)),
         );
         result.push_str(
             &self
                 .empty_style
-                .render(&self.empty_char.to_string().repeat(empty as usize)),
+                .render(&self.empty_char.to_string().repeat(empty)),
         );
         if self.show_pct {
-            let _ = write!(result, " {:3.0}%", self.value * 100.0);
+            let _ = write!(result, " {:3.0}%", value * 100.0);
         }
         result
     }
@@ -239,9 +239,26 @@ mod tests {
     }
 
     #[test]
+    fn clamped_values_show_the_limit_percentage() {
+        assert!(ProgressBar::new(2.0).render().ends_with("100%"));
+        assert!(ProgressBar::new(-1.0).render().ends_with("  0%"));
+    }
+
+    #[test]
     fn zero_width_renders_only_the_percentage() {
         let bar = ProgressBar::new(0.5).width(0).render();
         assert_eq!(bar, "  50%");
+    }
+
+    #[test]
+    fn bar_fills_the_requested_width() {
+        let bar = ProgressBar::new(0.5)
+            .width(10)
+            .fill_style(Style::new())
+            .empty_style(Style::new())
+            .show_percentage(false)
+            .render();
+        assert_eq!(bar, format!("{}{}", "█".repeat(5), "░".repeat(5)));
     }
 
     #[test]
@@ -268,14 +285,8 @@ mod tests {
     }
 
     #[test]
-    fn filled_portion_matches_the_ratio() {
-        let bar = ProgressBar::new(0.25)
-            .width(8)
-            .show_percentage(false)
-            .render();
-        let bar = charm_core::strip_ansi(&bar);
-        assert_eq!(bar.chars().filter(|c| *c == FILL_GLYPH).count(), 2);
-        assert_eq!(bar.chars().filter(|c| *c == EMPTY_GLYPH).count(), 6);
+    fn width_is_clamped_to_the_maximum() {
+        assert_eq!(ProgressBar::new(0.5).width(600).width, 500);
     }
 
     #[test]
@@ -284,5 +295,6 @@ mod tests {
         bar.value = -0.5;
         let rendered = charm_core::strip_ansi(&bar.render());
         assert_eq!(rendered.chars().filter(|c| *c == FILL_GLYPH).count(), 0);
+        assert!(rendered.ends_with("  0%"));
     }
 }

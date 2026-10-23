@@ -448,7 +448,11 @@ mod tests {
 
     #[test]
     fn complementary_real() {
-        let cases = [("402080", "608020"), ("00a0b0", "b01000"), ("f0e68c", "8c96f0")];
+        let cases = [
+            ("402080", "608020"),
+            ("00a0b0", "b01000"),
+            ("f0e68c", "8c96f0"),
+        ];
         for (input, expected) in cases {
             let base = from_hex(input);
             assert_eq!(to_hex(complementary(base)), format!("#{expected}"));

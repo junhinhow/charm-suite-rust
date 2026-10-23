@@ -63,11 +63,51 @@ cargo run -p charm-dialog --example charm_dialog_demo
 | `Styles::default()` | A paleta padrao do `DefaultStyles()` do Go |
 | `Dialog { title, message, buttons, selected, r#type, input_value, input_prompt, styles }` | Um dialogo. Todos os campos sao publicos |
 | `Dialog::new_confirm`, `new_alert`, `new_input`, `new_custom` | Construtores |
-| `Dialog::with_styles(styles)` | Substitui os estilos |
+| `Dialog::with_styles(self, styles)` | Substitui os estilos e devolve o dialogo |
+| `Dialog::set_styles(&mut self, styles)` | Substitui os estilos no proprio dialogo |
 | `Dialog::next_button()` / `prev_button()` | Move a selecao, limitada as bordas |
 | `Dialog::selected_button()` | Rotulo do botao selecionado, ou `""` |
+| `Dialog::set_key_msg(&KeyMsg)` | Trata uma tecla; devolve `(Action, consumida)` |
+| `Dialog::handle_msg(&Message)` | Trata uma mensagem do Bubble Tea; teclas vao para `set_key_msg` |
 | `Dialog::render(largura)` | A caixa, centralizada em `largura` colunas (`0` = sem centralizar) |
 | `Dialog::render_overlay(largura, altura)` | A caixa centralizada em uma area `largura` x `altura` |
+| `Action` | `None`, `Submit`, `Cancel`. O `Display` imprime `none`, `submit` ou `cancel` |
+
+## Teclado
+
+O tratamento de teclas usa o tipo `KeyMsg` do `charmed-bubbletea`, o runtime
+usado por este workspace. Dentro de uma funcao `update`, passe a mensagem para
+`handle_msg`:
+
+```rust
+use charm_dialog::{Action, Dialog};
+use charmed_bubbletea::{KeyMsg, KeyType};
+
+let mut dialog = Dialog::new_input("Renomear", "Digite o novo nome:");
+for c in "docs".chars() {
+    dialog.set_key_msg(&KeyMsg::from_char(c));
+}
+
+let (action, consumida) = dialog.set_key_msg(&KeyMsg::from_type(KeyType::Enter));
+assert_eq!(action, Action::Submit);
+assert!(consumida);
+```
+
+Quando `consumida` for `false`, a aplicacao deve seguir com o processamento
+normal da tecla.
+
+| Tecla | Efeito |
+|-------|--------|
+| `left` | Botao anterior |
+| `right`, `tab` | Proximo botao |
+| `shift+tab` | Botao anterior |
+| `enter` | `Action::Submit` |
+| `esc` | `Action::Cancel` |
+| caracteres imprimiveis (dialogos de entrada) | Acrescentados a `input_value` |
+| `backspace` (dialogos de entrada) | Apaga o ultimo caractere |
+| `ctrl+u` (dialogos de entrada) | Limpa `input_value` |
+
+O cursor do texto nao se move: o texto e sempre digitado no fim.
 
 ## Dialogos de entrada
 
@@ -89,7 +129,7 @@ assert!(texto.contains("Ana_"));
 
 O golden file `tests/golden/dialog.txt` e gerado pelo programa Go em
 `reference/go/charm-dialog/cmd/parity`. Ele cobre todos os tipos de dialogo, a
-navegacao, `Render` nas larguras 0, 20, 40 e 80, e `RenderOverlay` em dois
+navegacao, `Render` nas larguras 0, 40 e 80, e `RenderOverlay` em dois
 tamanhos. A comparacao remove codigos ANSI e espacos no fim das linhas dos
 dois lados.
 
@@ -101,20 +141,33 @@ cargo run -p charm-parity --bin parity -- gen \
 cargo test -p charm-dialog
 ```
 
+A largura `20` nao esta no golden file: ela e menor que a linha de botoes, onde
+a saida do Go sai do limite documentado. Veja abaixo.
+
 ## Diferencas conhecidas
 
 | Go | Rust |
 |----|------|
 | `dialog.DefaultStyles()` | `Styles::default()` |
-| Metodos por valor do `dialog.Dialog` (`WithStyles`, `SelectedButton`, `Render`) | Metodos em `Dialog`: `with_styles(self)`, `selected_button(&self)`, `render(&self)` |
+| `WithStyles` (receptor por ponteiro: altera o dialogo e devolve uma copia) | `set_styles(&mut self)` altera o dialogo; `with_styles(self)` consome e devolve o novo |
+| `SelectedButton`, `Render`, `RenderOverlay` (receptor por valor) | `selected_button(&self)`, `render(&self)`, `render_overlay(&self)` |
 | `Dialog.Type` | `Dialog.r#type` (`type` e palavra reservada do Rust) |
 | `Buttons []string` | `buttons: Vec<String>`; os construtores recebem `&str` |
 | `NewCustom(titulo, mensagem, buttons []string)` | `Dialog::new_custom(titulo, mensagem, &[&str])` |
 | `Selected int` | `selected: usize` |
+| `SetKeyMsg(tea.KeyPressMsg)`, `HandleMsg(tea.Msg)` | `set_key_msg(&KeyMsg)`, `handle_msg(&Message)` do `charmed-bubbletea` |
+| `Action.String()` | `Display` para `Action`, com os mesmos textos |
+| `width` e `height` como `int` (valores negativos sao aceitos) | `usize`; um valor negativo nao compila |
 
 O comportamento e o mesmo: `NextButton` e `PrevButton` param nas bordas sem
 dar a volta, `SelectedButton` devolve `""` quando nao ha botoes, e
 `Render(0)` nao centraliza horizontalmente.
+
+**Larguras estreitas.** Quando `width` e menor que a linha de botoes, a saida
+do Go pode ficar mais larga que `width` (por exemplo, 22 colunas para `width`
+20) e os botoes quebram em outros lugares. O port mantem todas as linhas dentro
+de `width`, como descreve a documentacao do Go. A quebra da linha de botoes
+tambem difere do Go em uma ou duas colunas nessas larguras.
 
 ## Licenca
 

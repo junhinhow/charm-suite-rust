@@ -1,4 +1,4 @@
-﻿//! Markdown style configuration derived from a [`Theme`], mirroring `glamour`.
+//! Markdown style configuration derived from a [`Theme`], mirroring `glamour`.
 //!
 //! The types match `ansi.StyleConfig` of `charm.land/glamour/v2`: same fields,
 //! same order and the same JSON names. Serializing [`StyleConfig`] with

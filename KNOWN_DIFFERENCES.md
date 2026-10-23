@@ -30,7 +30,10 @@ Legenda da coluna **Impacto**: o que muda para quem usa a biblioteca ou a CLI.
 | `charm-palette` | Ordem alfabética das cores (`BTreeMap`) | O Go itera mapas, cuja ordem é aleatória | Saída determinística; a ordem não coincide com o Go |
 | `charm-spinner` | `spinner.Dots` (variável de pacote) vira a função `dots()` | Sem variáveis globais mutáveis em Rust | Chamadas precisam de `()` |
 | `charm-spinner` | `All()` retorna `map[string]Spinner` no Go; no Rust, `all()` retorna `BTreeMap` ordenado | Mapas do Go não são ordenados | Ordem previsível |
-| `charm-spinner` | `var Style` mutável do Go vira `DEFAULT_STYLE` (`LazyLock`) e `default_style()` | Evita estado global mutável | Não é possível alterar o estilo padrão globalmente, como no Go |
+| `charm-spinner` | `var Style` do Go vira `DEFAULT_STYLE` (valor inicial, `LazyLock`) e o estilo atual é `default_style()`. `SetDefaultStyle` vira `set_default_style()`, guardado em um `RwLock` | Mesmo comportamento do Go, com sincronização explícita | Troca do estilo padrão é segura entre threads, como no Go |
+| `charm-spinner` | `Spinner.Style` vira o campo público `style: Option<Style>`; `Spinner` implementa `PartialEq`/`Eq` à mão | `lipgloss::Style` não implementa `PartialEq`; `None` equivale ao estilo vazio do Go | Literais de struct precisam de `style: None`; `with_style` é a forma de builder |
+| `charm-spinner` | `Render(frame int)` aceita índice negativo (conta a partir do fim) no Go; no Rust, `render(frame: usize)` não tem índice negativo | Tipo sem sinal idiomático | Use `frames.len() - n` para contar a partir do fim |
+| `charm-spinner` | `spinner.Clone()` do Go devolve uma cópia do mapa; no Rust, `all()` já devolve uma cópia nova a cada chamada | Ownership do Rust | Não há função `clone` separada |
 | `charm-spinner` | `render` com zero frames retorna string vazia; o Go entra em pânico | Biblioteca não deve entrar em pânico | Caso de borda sem erro |
 | `charm-toast` | Sem `sync.Mutex`: a API é síncrona com `&mut self` | Ownership do Rust torna o lock desnecessário | Uso concorrente exige `Mutex` do chamador |
 | `charm-toast` | `CreatedAt time.Time` vira `created_at: Instant` (monotônico) | A expiração não é afetada por mudanças do relógio do sistema | Tipo diferente; não é uma data civil |
@@ -59,7 +62,6 @@ Legenda da coluna **Impacto**: o que muda para quem usa a biblioteca ou a CLI.
 | `charm-form` | O renderizador usa `charmed-bubbletea` 0.2.4 e marcadores simples, não Bubble Tea v2 + Lip Gloss v2; o runtime Rust consome Ctrl+C antes de chamar `Model::update`, então o runner trata um modelo não concluído como cancelado | A API disponível no workspace tem contrato Elm diferente do Bubble Tea Go; a saída de teclado permanece portável | Fluxo e teclas equivalentes, mas estilo visual diferente; Ctrl+C reportado como cancelamento pelo runner |
 | `charm-form` | `renderer::Options` configura dimensões iniciais para execução com streams customizados; o runtime Rust não oferece o equivalente direto a `WithWindowSize` no `Program` | Limitação da API do `charmed-bubbletea` 0.2.4 | A entrada programada não acompanha redimensionamentos do terminal |
 | `charm-notify` | Usa `NotifyOptions` no lugar do builder previsto no roadmap | Espelha as funções `Option` do Go | Nenhum para quem segue a documentação |
-| `charm-notify` | Linux sem `notify-send`: a mensagem de erro não traz a dica de instalação (a dica está na tabela do README) | Mensagens de erro simples | Menos orientação no próprio erro |
 | `charm-notify` | Depende de binários externos: `notify-send`, `osascript`, `powershell` ou `msg` | O Go também invoca processos; não há bindings nativos | Testes validam o comando montado, não o envio real |
 | `charm-notify` | `platform()` retorna `Option<&str>` (`None` onde o Go retorna `""`); `Capabilities` usa campos `bool` | Tipo idiomático em Rust | Quem comparava com `""` precisa ajustar |
 | `charm-notify` | `Error::ProcessFailed` traz `program` e `stderr`; o `CommandError` do Go também guarda `Args`, que o Rust não mantém | Forma do enum de erro | Argumentos do comando não aparecem na mensagem de erro |
@@ -72,15 +74,12 @@ Legenda da coluna **Impacto**: o que muda para quem usa a biblioteca ou a CLI.
 | `charm-table-cli` | O crate se chama `charm-table-cli`, mas o binário é `charm-table` | Nome do binário escolhido no `Cargo.toml` | Invoque `charm-table`, não `charm-table-cli` |
 | `charm-table-cli` | Flags com dois hífens (`--style`, `--no-header`). `-style` e `-header=false` não são aceitos | Parser `clap` | Scripts que usam hífen simples precisam ser ajustados |
 | `charm-table-cli` | `--style` inválido é rejeitado com erro (saída 2). O Go cai silenciosamente em `rounded` | Erro explícito é preferível a substituição silenciosa | Comportamento de erro diferente |
-| `charm-table-cli` | Colunas de objeto JSON seguem a ordem do documento. O Go usa a ordem aleatória do mapa | Ordem aleatória não é reproduzível | Saída determinística |
-| `charm-table-cli` | TSV com célula vazia no meio (`1\t\t3`) é lido como três campos. O Go falha com `wrong number of fields` | No Go, `TrimLeadingSpace` também consome os tabs, e o campo vazio desaparece | Entrada que o Go rejeita é aceita |
+| `charm-table-cli` | Aspas soltas dentro de um campo (`LazyQuotes` do Go) são interpretadas pelo crate `csv` | Dependência `csv`, sem modo `LazyQuotes` | Aspas malformadas podem dar valor de célula diferente |
 | `charm-table-cli` | Mensagem de erro de CSV: o prefixo é igual, mas o detalhe vem do crate `csv` | Dependência `csv` | Texto do detalhe diferente |
 | `charm-table-cli` | Cores indexadas (`38;5;63`) saem como truecolor (`38;2;95;95;255`) | `lipgloss` converte cores indexadas para RGB | Sequências ANSI diferentes, mesma cor exibida |
-| `charm-table-cli` | JSON Lines sem limite de 64 KB por linha | O limite do Go vem do `bufio.Scanner`, não é uma funcionalidade | Linhas longas são aceitas |
+| `charm-table-cli` | Mensagens de erro com acentos (`não`, `é`) saem sem acentos (`nao`, `e`) | Código-fonte em ASCII | Texto diferente; a redação segue o Go |
+| `charm-table-cli` | Largura de sequências de emoji com ZWJ e seletores de variação é calculada caractere a caractere (`unicode-width`); o Go usa `ansi.StringWidth` | Dependência `unicode-width` | Algumas larguras de emoji compostos podem diferir |
 | `charm-table-cli` | Bytes UTF-8 inválidos são substituídos por `U+FFFD` | `String` do Rust é sempre UTF-8 válido | Entrada inválida é corrigida, não passada adiante |
-| `charm-table-cli` | Herdado do Go: `--max-width` é aproximado (cada coluna perde a mesma fração, mínimo de 3 caracteres) | Paridade com o Go | Tabela estreita pode continuar mais larga que o limite |
-| `charm-table-cli` | Herdado do Go: tamanhos são contados em caracteres (runes), não em colunas de terminal | Paridade com o Go | CJK e emoji podem desalinhar a tabela |
-| `charm-table-cli` | Herdado do Go: números seguem `%g` (`1e-07`, `1.23456785e+07`), e arrays e objetos aninhados viram JSON compacto com chaves ordenadas e `<`, `>`, `&` escapados | Paridade com o Go | Nenhum para quem usa a saída como o Go |
 
 ---
 
@@ -91,9 +90,9 @@ Diferenças que valem para vários crates:
 | Tema | Diferença | Motivo | Impacto |
 |---|---|---|---|
 | ANSI | O port **sempre** emite sequências ANSI. O Go só emite cores quando stdout é um TTY | `lipgloss` do Rust não consulta o terminal; afeta `charm-diff`, `charm-wizard`, `charm-table-cli` e outros | Ao comparar com o Go, remova o ANSI (`charm_core::strip_ansi`). A suíte de paridade já faz isso |
-| Erros | Mensagens de erro estão em inglês. O Go usa português em alguns crates | Convenção do crates.io | Texto de erro diferente; códigos e tipos são iguais |
+| Erros | Mensagens de erro estão em inglês em alguns crates e em português sem acentos em outros (`charm-table-cli`). O Go usa português com acentos | Convenção do crates.io e código-fonte em ASCII | Texto de erro diferente; códigos e tipos são iguais |
 | Pânicos | Casos em que o Go entra em pânico (`spinner`, `wizard`, `charts`, `layout`) retornam vazio ou limitam o valor | Biblioteca não deve interromper o programa | Casos de borda sem exceção |
-| Estado global | Sem variáveis mutáveis de pacote, sem `sync.Mutex` e sem goroutines | Ownership e API síncrona | Concorrência é responsabilidade do chamador |
+| Estado global | Sem variáveis mutáveis de pacote na API, sem goroutines. A única exceção é o estilo padrão do `charm-spinner`, guardado em `RwLock` e trocado por `set_default_style` | Ownership e API síncrona; o Go também tem estado global, mas o troca com `SetDefaultStyle` | Concorrência é responsabilidade do chamador, exceto pelo estilo padrão do spinner |
 | Ordem | Mapas do Go são substituídos por `BTreeMap` quando a saída depende da ordem | Mapas do Go têm ordem aleatória | Saída determinística |
 | Strings | Toda saída é UTF-8 válido. Bytes inválidos viram `U+FFFD` | `String` do Rust | Entradas inválidas são corrigidas |
 | APIs extras | Existem funções que o Go não tem: `run_to`, `*_at`, `DevInspect`, `{}` nos templates do i18n | Testabilidade e ergonomia | Adições; não quebram código que segue a API do Go |

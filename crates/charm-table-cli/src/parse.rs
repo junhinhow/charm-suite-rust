@@ -1,35 +1,63 @@
 //! Input format detection and parsing.
 //!
-//! The rules mirror `detectAndParse` of the Go original: a trimmed input that
+//! Mirrors `parse.go` and `input.go` of the Go original. A trimmed input that
 //! starts with `[` is a JSON array, one that starts with `{` is JSON Lines, and
-//! anything else is delimited text. Delimited text is tab-separated when its
-//! first line contains a tab and comma-separated otherwise.
+//! anything else is delimited text. [`detect_delimiter`] chooses between tab and
+//! comma while ignoring separators inside quoted fields.
 
+use std::collections::HashSet;
 use std::fmt::Write as _;
 
 use serde_json::{Map, Value};
 
+/// Largest JSON Lines record accepted, in bytes (16 MiB), as in the Go original.
+const MAX_JSONL_LINE: usize = 16 * 1024 * 1024;
+
+/// Byte order mark that spreadsheet and BI exports put at the start of a file.
+const BYTE_ORDER_MARK: char = '\u{feff}';
+
 /// Error produced while parsing the input.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ParseError {
+    /// The input is empty or contains only whitespace.
+    #[error("entrada vazia: nenhum dado para renderizar")]
+    Empty,
     /// The input starts with `[` but is not a JSON array of objects.
-    #[error("JSON invalido: {0}")]
+    #[error("JSON invalido: esperava um array de objetos: {0}")]
     InvalidJsonArray(#[source] serde_json::Error),
     /// The JSON array has no elements.
-    #[error("array JSON vazio")]
+    #[error("array JSON vazio: nenhum registro para renderizar")]
     EmptyJsonArray,
     /// A JSON Lines record could not be decoded.
-    #[error("JSONL invalido na linha: {0}")]
-    InvalidJsonl(#[source] serde_json::Error),
+    #[error("JSONL invalido na linha {line}: {source}")]
+    InvalidJsonl {
+        /// One-based number of the offending line.
+        line: usize,
+        /// Underlying JSON error.
+        #[source]
+        source: serde_json::Error,
+    },
+    /// A JSON Lines record is longer than the 16 MiB limit.
+    #[error("erro ao ler JSONL: bufio.Scanner: token too long")]
+    JsonlLineTooLong,
     /// The JSON Lines input has no records.
     #[error("nenhum registro JSONL encontrado")]
     EmptyJsonl,
-    /// The delimited text is malformed, e.g. a record has a different field count.
-    #[error("erro ao processar dados delimitados: {0}")]
-    Delimited(#[source] csv::Error),
+    /// The delimited text is malformed.
+    #[error("erro ao ler dados {format}: {source}")]
+    Delimited {
+        /// `"CSV"` or `"TSV"`.
+        format: &'static str,
+        /// Underlying CSV error.
+        #[source]
+        source: csv::Error,
+    },
     /// The delimited text has no records.
-    #[error("dados vazios")]
-    EmptyDelimited,
+    #[error("nenhum registro encontrado nos dados {format}")]
+    EmptyDelimited {
+        /// `"CSV"` or `"TSV"`.
+        format: &'static str,
+    },
 }
 
 /// Headers and cell values extracted from the input.
@@ -43,133 +71,236 @@ pub(crate) struct Table {
 
 /// Detects the input format and parses it into a [`Table`].
 ///
-/// When `use_header` is `false` (or the delimited input has a single record),
-/// the headers are generated as `Col1`, `Col2`, and so on.
+/// When `use_header` is `false`, the headers are generated as `Col1`, `Col2`,
+/// and so on, for every format.
 pub(crate) fn detect_and_parse(data: &str, use_header: bool) -> Result<Table, ParseError> {
-    let trimmed = data.trim();
-
+    let trimmed = data.strip_prefix(BYTE_ORDER_MARK).unwrap_or(data).trim();
+    if trimmed.is_empty() {
+        return Err(ParseError::Empty);
+    }
     if trimmed.starts_with('[') {
-        return parse_json_array(trimmed);
+        return parse_json_array(trimmed, use_header);
     }
     if trimmed.starts_with('{') {
-        return parse_jsonl(trimmed);
+        return parse_jsonl(trimmed, use_header);
     }
+    parse_delimited(trimmed, detect_delimiter(trimmed), use_header)
+}
 
-    let first_line = trimmed.split('\n').next().unwrap_or_default();
-    let delimiter = if first_line.contains('\t') {
+/// Chooses the delimiter (`b'\t'` or `b','`) for delimited text.
+///
+/// Separators that sit inside quoted fields do not count, so a CSV file with a
+/// tab inside a quoted field is not mistaken for TSV. When the first line has
+/// no visible separator, the candidate that yields more fields in the first
+/// record wins.
+pub(crate) fn detect_delimiter(data: &str) -> u8 {
+    let line = first_non_empty_line(data);
+    if count_unquoted(line, b'\t') > 0 {
+        return b'\t';
+    }
+    if count_unquoted(line, b',') > 0 {
+        return b',';
+    }
+    if count_first_record_fields(data, b'\t') > count_first_record_fields(data, b',') {
         b'\t'
     } else {
         b','
-    };
-    parse_delimited(trimmed, delimiter, use_header)
+    }
 }
 
-/// Parses a JSON array of objects. The first object's keys become the headers.
-fn parse_json_array(data: &str) -> Result<Table, ParseError> {
+/// Returns the first line whose trimmed content is not empty.
+fn first_non_empty_line(data: &str) -> &str {
+    data.split('\n')
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("")
+}
+
+/// Counts `separator` bytes that are outside quoted fields.
+///
+/// A doubled quote inside a quoted field is an escape, not a field boundary.
+fn count_unquoted(line: &str, separator: u8) -> usize {
+    let bytes = line.as_bytes();
+    let mut total = 0;
+    let mut in_quotes = false;
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'"' => {
+                if in_quotes && bytes.get(index + 1) == Some(&b'"') {
+                    index += 2;
+                    continue;
+                }
+                in_quotes = !in_quotes;
+            }
+            byte if byte == separator && !in_quotes => total += 1,
+            _ => {}
+        }
+        index += 1;
+    }
+    total
+}
+
+/// Counts the fields of the first record read with `delimiter`.
+fn count_first_record_fields(data: &str, delimiter: u8) -> usize {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .delimiter(delimiter)
+        .flexible(true)
+        .from_reader(data.as_bytes());
+    match reader.records().next() {
+        Some(Ok(record)) => record.len(),
+        _ => 0,
+    }
+}
+
+/// Parses a JSON array of objects. The keys of every record become the columns.
+fn parse_json_array(data: &str, use_header: bool) -> Result<Table, ParseError> {
     let records: Vec<Option<Map<String, Value>>> =
         serde_json::from_str(data).map_err(ParseError::InvalidJsonArray)?;
     if records.is_empty() {
         return Err(ParseError::EmptyJsonArray);
     }
-    Ok(table_from_records(&records))
+    Ok(table_from_records(&records, use_header))
 }
 
 /// Parses JSON Lines: one object per non-blank line.
-fn parse_jsonl(data: &str) -> Result<Table, ParseError> {
+///
+/// Lines longer than 16 MiB are rejected before they are decoded, and a decode
+/// error reports the line number.
+fn parse_jsonl(data: &str, use_header: bool) -> Result<Table, ParseError> {
     let mut records = Vec::new();
-    for line in data.lines().map(str::trim).filter(|line| !line.is_empty()) {
+    for (index, raw) in data.lines().enumerate() {
+        if raw.len() > MAX_JSONL_LINE {
+            return Err(ParseError::JsonlLineTooLong);
+        }
+        let line = raw.trim();
+        if line.is_empty() {
+            continue;
+        }
         let record: Option<Map<String, Value>> =
-            serde_json::from_str(line).map_err(ParseError::InvalidJsonl)?;
+            serde_json::from_str(line).map_err(|source| ParseError::InvalidJsonl {
+                line: index + 1,
+                source,
+            })?;
         records.push(record);
     }
     if records.is_empty() {
         return Err(ParseError::EmptyJsonl);
     }
-    Ok(table_from_records(&records))
+    Ok(table_from_records(&records, use_header))
 }
 
-/// Parses CSV or TSV text. Field splitting follows the Go `encoding/csv`
-/// reader configured with `LazyQuotes` and `TrimLeadingSpace`.
+/// Parses CSV or TSV text.
+///
+/// Records with different numbers of fields are accepted: every row is padded
+/// with empty cells up to the widest record. Leading spaces are kept.
 fn parse_delimited(data: &str, delimiter: u8, use_header: bool) -> Result<Table, ParseError> {
+    let format = if delimiter == b'\t' { "TSV" } else { "CSV" };
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
         .delimiter(delimiter)
+        .flexible(true)
         .from_reader(data.as_bytes());
 
-    let mut all: Vec<Vec<String>> = Vec::new();
+    let mut records: Vec<Vec<String>> = Vec::new();
     for record in reader.records() {
-        let record = record.map_err(ParseError::Delimited)?;
-        all.push(
-            record
-                .iter()
-                .map(|field| field.trim_start().to_owned())
-                .collect(),
-        );
+        let record = record.map_err(|source| ParseError::Delimited { format, source })?;
+        records.push(record.iter().map(str::to_owned).collect());
     }
-    if all.is_empty() {
-        return Err(ParseError::EmptyDelimited);
+    if records.is_empty() {
+        return Err(ParseError::EmptyDelimited { format });
     }
+    normalize_rows(&mut records);
 
-    if use_header && all.len() > 1 {
-        let mut records = all.into_iter();
+    if use_header {
+        let mut records = records.into_iter();
         let headers = records.next().unwrap_or_default();
         Ok(Table {
             headers,
             rows: records.collect(),
         })
     } else {
-        let columns = all.first().map_or(0, Vec::len);
-        let headers = (1..=columns).map(|i| format!("Col{i}")).collect();
-        Ok(Table { headers, rows: all })
+        let columns = records.first().map_or(0, Vec::len);
+        Ok(Table {
+            headers: generic_headers(columns),
+            rows: records,
+        })
     }
 }
 
-/// Builds a table from JSON records, using the keys of the first record as
-/// columns. A `null` record and a missing key both render as an empty cell.
-fn table_from_records(records: &[Option<Map<String, Value>>]) -> Table {
-    let headers = records
-        .first()
-        .and_then(|record| record.as_ref())
-        .map(extract_keys)
-        .unwrap_or_default();
+/// Pads every row with empty cells up to the width of the widest row.
+fn normalize_rows(rows: &mut [Vec<String>]) {
+    let widest = rows.iter().map(Vec::len).max().unwrap_or(0);
+    for row in rows {
+        row.resize(widest, String::new());
+    }
+}
 
-    let rows = records
+/// Builds the table from JSON records.
+///
+/// The columns are the union of the keys of every record (see
+/// [`collect_keys`]). A `null` record and a missing key both render as an empty
+/// cell.
+fn table_from_records(records: &[Option<Map<String, Value>>], use_header: bool) -> Table {
+    let keys = collect_keys(records);
+    let rows: Vec<Vec<String>> = records
         .iter()
         .map(|record| {
-            headers
-                .iter()
-                .map(|header| {
+            keys.iter()
+                .map(|key| {
                     record
                         .as_ref()
-                        .and_then(|map| map.get(header))
-                        .map(format_value)
-                        .unwrap_or_default()
+                        .and_then(|map| map.get(key))
+                        .map_or_else(String::new, format_value)
                 })
                 .collect()
         })
         .collect();
-
+    let headers = if use_header {
+        keys
+    } else {
+        generic_headers(keys.len())
+    };
     Table { headers, rows }
 }
 
-/// Returns the keys of a JSON object in document order.
-pub(crate) fn extract_keys(map: &Map<String, Value>) -> Vec<String> {
-    map.keys().cloned().collect()
+/// Unites the keys of all records, in order of first appearance.
+///
+/// Inside each record the keys are sorted, so the column order is the same on
+/// every run; a Go map would iterate in random order.
+fn collect_keys(records: &[Option<Map<String, Value>>]) -> Vec<String> {
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut keys: Vec<String> = Vec::new();
+    for record in records.iter().flatten() {
+        let mut current: Vec<&String> = record.keys().collect();
+        current.sort();
+        for key in current {
+            if seen.insert(key.as_str()) {
+                keys.push(key.clone());
+            }
+        }
+    }
+    keys
+}
+
+/// Generates the column names `Col1`, `Col2`, and so on.
+fn generic_headers(count: usize) -> Vec<String> {
+    (1..=count).map(|index| format!("Col{index}")).collect()
 }
 
 /// Converts a JSON value to the text shown in a cell.
 ///
 /// Strings are used verbatim, `null` becomes an empty string, booleans become
-/// `true`/`false`, numbers follow Go's `float64` formatting, and arrays and
-/// objects are encoded as compact JSON with sorted keys, like Go's
-/// `json.Marshal`.
+/// `true`/`false`, numbers use the shortest decimal form that round-trips (no
+/// exponent, like Go's `FormatFloat(v, 'f', -1, 64)`), and arrays and objects
+/// are encoded as compact JSON with sorted keys, like Go's `json.Marshal`.
 ///
 /// # Examples
 ///
 /// ```text
 /// format_value(&json!(42))      == "42"
-/// format_value(&json!(2.5))     == "2.5"
-/// format_value(&json!(1e-7))    == "1e-07"
+/// format_value(&json!(1e-7))    == "0.0000001"
 /// format_value(&json!({"b": 1, "a": "x&y"})) == r#"{"a":"x\u0026y","b":1}"#
 /// ```
 pub(crate) fn format_value(value: &Value) -> String {
@@ -177,72 +308,13 @@ pub(crate) fn format_value(value: &Value) -> String {
         Value::Null => String::new(),
         Value::String(text) => text.clone(),
         Value::Bool(flag) => flag.to_string(),
-        Value::Number(number) => format_float(number.as_f64().unwrap_or(f64::NAN)),
+        Value::Number(number) => number.as_f64().unwrap_or(f64::NAN).to_string(),
         Value::Array(_) | Value::Object(_) => {
             let mut out = String::new();
             write_go_json(value, &mut out);
             out
         }
     }
-}
-
-/// Formats a number like Go's `formatValue`: integral values within the `i64`
-/// range print as integers, everything else uses `%g`.
-fn format_float(value: f64) -> String {
-    const LIMIT: f64 = 9_223_372_036_854_775_808.0;
-    if value.fract() == 0.0 && (-LIMIT..LIMIT).contains(&value) {
-        return (value as i64).to_string();
-    }
-    format_g(value)
-}
-
-/// Formats a finite float like Go's `%g` with the shortest representation.
-fn format_g(value: f64) -> String {
-    if value.is_nan() {
-        return "NaN".to_owned();
-    }
-    let (digits, exp) = shortest_digits(value.abs());
-    let point = exp + 1;
-
-    let mut out = String::new();
-    if value.is_sign_negative() {
-        out.push('-');
-    }
-    if !(-4..6).contains(&exp) {
-        out.push_str(&digits[..1]);
-        if digits.len() > 1 {
-            out.push('.');
-            out.push_str(&digits[1..]);
-        }
-        let sign = if exp < 0 { '-' } else { '+' };
-        let _ = write!(out, "e{sign}{:02}", exp.abs());
-    } else if point <= 0 {
-        out.push_str("0.");
-        out.push_str(&"0".repeat(usize::try_from(-point).unwrap_or(0)));
-        out.push_str(&digits);
-    } else {
-        let point = usize::try_from(point).unwrap_or(0);
-        if digits.len() <= point {
-            out.push_str(&digits);
-            out.push_str(&"0".repeat(point - digits.len()));
-        } else {
-            out.push_str(&digits[..point]);
-            out.push('.');
-            out.push_str(&digits[point..]);
-        }
-    }
-    out
-}
-
-/// Returns the shortest round-trip significant digits and the decimal exponent
-/// of a finite, non-zero, non-negative float.
-fn shortest_digits(value: f64) -> (String, i32) {
-    let scientific = format!("{value:e}");
-    let (mantissa, exp) = scientific
-        .split_once('e')
-        .unwrap_or((scientific.as_str(), "0"));
-    let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
-    (digits, exp.parse().unwrap_or(0))
 }
 
 /// Encodes a JSON value the way Go's `json.Marshal` does for `map[string]any`.
@@ -342,7 +414,7 @@ mod tests {
     fn format_value_integers_and_zero() {
         assert_eq!(format_value(&json!(42)), "42");
         assert_eq!(format_value(&json!(-7)), "-7");
-        assert_eq!(format_value(&json!(-0.0)), "0");
+        assert_eq!(format_value(&json!(-0.0)), "-0");
         assert_eq!(
             format_value(&json!(1_000_000_000_000_000_000_i64)),
             "1000000000000000000"
@@ -350,13 +422,13 @@ mod tests {
     }
 
     #[test]
-    fn format_value_floats_use_go_g_format() {
+    fn format_value_floats_never_use_an_exponent() {
         assert_eq!(format_value(&json!(2.5)), "2.5");
-        assert_eq!(format_value(&json!(0.000_012)), "1.2e-05");
-        assert_eq!(format_value(&json!(1e-7)), "1e-07");
-        assert_eq!(format_value(&json!(12_345_678.5)), "1.23456785e+07");
+        assert_eq!(format_value(&json!(0.000_012)), "0.000012");
+        assert_eq!(format_value(&json!(1e-7)), "0.0000001");
+        assert_eq!(format_value(&json!(12_345_678.5)), "12345678.5");
         assert_eq!(format_value(&json!(0.001_5)), "0.0015");
-        assert_eq!(format_value(&json!(1e21)), "1e+21");
+        assert_eq!(format_value(&json!(1e21)), "1000000000000000000000");
     }
 
     #[test]
@@ -364,6 +436,11 @@ mod tests {
         let value = json!({"b": 1, "a": ["x&y", null, 2.5]});
         assert_eq!(format_value(&value), r#"{"a":["x\u0026y",null,2.5],"b":1}"#);
         assert_eq!(format_value(&json!([])), "[]");
+    }
+
+    #[test]
+    fn nested_numbers_use_go_json_exponent_form() {
+        assert_eq!(format_value(&json!([1e-7, 1e21])), "[1e-7,1e+21]");
     }
 
     #[test]
@@ -383,6 +460,43 @@ mod tests {
     }
 
     #[test]
+    fn detects_tsv() {
+        assert_eq!(detect_delimiter("nome\tidade\nAlice\t30"), b'\t');
+    }
+
+    #[test]
+    fn quoted_tab_in_the_first_line_is_not_tsv() {
+        let data = "\"nome\tcom aspas\",idade\nAlice,30";
+        assert_eq!(detect_delimiter(data), b',');
+        let table = detect_and_parse(data, true).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["nome\tcom aspas", "idade"]);
+        assert_eq!(table.rows, [["Alice", "30"]]);
+    }
+
+    #[test]
+    fn quoted_tab_in_the_second_line_is_not_tsv() {
+        let data = "nome,nota\nAlice,\"a\tb\"";
+        assert_eq!(detect_delimiter(data), b',');
+        let table = detect_and_parse(data, true).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["nome", "nota"]);
+        assert_eq!(table.rows[0][1], "a\tb");
+    }
+
+    #[test]
+    fn byte_order_mark_is_ignored() {
+        let table = detect_and_parse("\u{feff}a,b\n1,2", true).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["a", "b"]);
+    }
+
+    #[test]
+    fn whitespace_only_input_is_empty() {
+        assert!(matches!(
+            detect_and_parse("   \n  ", true),
+            Err(ParseError::Empty)
+        ));
+    }
+
+    #[test]
     fn delimited_without_header_generates_columns() {
         let table = detect_and_parse("x,y\n1,2\n", false).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(table.headers, ["Col1", "Col2"]);
@@ -390,7 +504,31 @@ mod tests {
     }
 
     #[test]
-    fn json_array_uses_first_record_keys_and_fills_gaps() {
+    fn single_line_keeps_the_real_header() {
+        let table =
+            parse_delimited("nome,idade,cidade", b',', true).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["nome", "idade", "cidade"]);
+        assert_eq!(table.rows, Vec::<Vec<String>>::new());
+    }
+
+    #[test]
+    fn ragged_rows_are_padded_to_the_widest_record() {
+        let table =
+            parse_delimited("a,b,c\n1,2\n3,4,5,6", b',', true).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["a", "b", "c", ""]);
+        assert_eq!(table.rows[0], ["1", "2", "", ""]);
+        assert_eq!(table.rows[1], ["3", "4", "5", "6"]);
+    }
+
+    #[test]
+    fn leading_spaces_are_preserved() {
+        let table = parse_delimited("nome, valor ,outro\nAlice, Bob ,Carol", b',', true)
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.rows[0][1], " Bob ");
+    }
+
+    #[test]
+    fn json_array_fills_gaps_for_missing_keys() {
         let table = detect_and_parse(r#"[{"a": 1, "b": "x"}, {"a": 2}, null]"#, true)
             .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(table.headers, ["a", "b"]);
@@ -398,20 +536,73 @@ mod tests {
     }
 
     #[test]
-    fn json_columns_keep_document_order() {
+    fn json_columns_are_sorted_inside_each_record() {
         let table =
             detect_and_parse(r#"[{"b": 1, "a": 2}]"#, true).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(table.headers, ["b", "a"]);
+        assert_eq!(table.headers, ["a", "b"]);
+    }
+
+    #[test]
+    fn json_columns_are_the_union_of_all_records() {
+        let data = r#"[{"zebra":1,"alfa":2,"meio":3},{"alfa":4,"novo":5}]"#;
+        let table = detect_and_parse(data, true).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["alfa", "meio", "zebra", "novo"]);
+        assert_eq!(table.rows[1], ["4", "", "", "5"]);
+    }
+
+    #[test]
+    fn json_without_header_generates_columns() {
+        let table = detect_and_parse(r#"[{"nome":"Alice","idade":30}]"#, false)
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["Col1", "Col2"]);
+        assert_eq!(table.rows.len(), 1);
+    }
+
+    #[test]
+    fn jsonl_union_of_keys() {
+        let table = detect_and_parse("{\"a\":1}\n{\"b\":2}\n{\"a\":3,\"c\":4}", true)
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["a", "b", "c"]);
+        assert_eq!(table.rows.len(), 3);
+        assert_eq!(table.rows[1][1], "2");
+    }
+
+    #[test]
+    fn jsonl_without_header_generates_columns() {
+        let table = detect_and_parse("{\"nome\":\"Alice\"}\n{\"nome\":\"Bob\"}", false)
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers, ["Col1"]);
+        assert_eq!(table.rows.len(), 2);
+    }
+
+    #[test]
+    fn jsonl_accepts_lines_longer_than_the_scanner_default() {
+        let value = "x".repeat(200 * 1024);
+        let data = format!("{{\"grande\":\"{value}\",\"id\":1}}");
+        let table = detect_and_parse(&data, true).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(table.headers.len(), 2);
+        assert_eq!(table.rows[0][0], value);
+    }
+
+    #[test]
+    fn jsonl_rejects_lines_over_the_limit() {
+        let value = "x".repeat(MAX_JSONL_LINE);
+        let data = format!("{{\"grande\":\"{value}\"}}");
+        assert!(matches!(
+            detect_and_parse(&data, true),
+            Err(ParseError::JsonlLineTooLong)
+        ));
     }
 
     #[test]
     fn errors_match_go_messages() {
         let cases = [
-            ("[]", "array JSON vazio"),
-            ("[{\"a\":", "JSON invalido"),
-            ("{\"a\":1}\n{bad", "JSONL invalido na linha"),
-            ("   \n  ", "dados vazios"),
-            ("a,b\n1,2,3\n", "erro ao processar dados delimitados"),
+            ("[]", "array JSON vazio: nenhum registro"),
+            ("[{\"a\":", "JSON invalido: esperava um array de objetos"),
+            ("[1,2,3]", "JSON invalido: esperava um array de objetos"),
+            ("{\"a\":1}\n{bad", "JSONL invalido na linha 2"),
+            ("{\"a\":1}\nnao e json", "JSONL invalido na linha 2"),
+            ("   \n  ", "entrada vazia: nenhum dado para renderizar"),
         ];
         for (input, message) in cases {
             let err = detect_and_parse(input, true).err().map(|e| e.to_string());
@@ -420,5 +611,11 @@ mod tests {
                 "input {input:?}: got {err:?}"
             );
         }
+    }
+
+    #[test]
+    fn go_number_exponent_is_trimmed() {
+        assert_eq!(go_json_number(1e-7), "1e-7");
+        assert_eq!(go_json_number(1e21), "1e+21");
     }
 }

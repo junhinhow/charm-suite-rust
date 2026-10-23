@@ -4,6 +4,8 @@
 //! [`github.com/junhinhow/charm-dialog`](https://github.com/junhinhow/charm-dialog).
 //! A [`Dialog`] is a plain value: it holds the title, message, buttons and
 //! selection state, and renders itself to a string with [`lipgloss`] styles.
+//! Key presses are routed to it with [`Dialog::set_key_msg`] or
+//! [`Dialog::handle_msg`].
 //!
 //! ```
 //! use charm_dialog::Dialog;
@@ -23,8 +25,11 @@
 
 use lipgloss::{Color, Style};
 
+mod keys;
 #[cfg(test)]
 mod tests;
+
+pub use keys::Action;
 
 /// The kind of a [`Dialog`].
 ///
@@ -177,7 +182,10 @@ impl Dialog {
         Self::build(DialogType::Custom, title, message, buttons)
     }
 
-    /// Replaces the styles of the dialog.
+    /// Replaces the styles of the dialog and returns it.
+    ///
+    /// Use [`Dialog::set_styles`] to change the styles of an existing value
+    /// in place, as the Go `WithStyles` method does.
     ///
     /// ```
     /// use charm_dialog::{Dialog, Styles};
@@ -189,6 +197,19 @@ impl Dialog {
     pub fn with_styles(mut self, styles: Styles) -> Self {
         self.styles = styles;
         self
+    }
+
+    /// Replaces the styles of the dialog in place.
+    ///
+    /// ```
+    /// use charm_dialog::{Dialog, Styles};
+    ///
+    /// let mut dialog = Dialog::new_alert("Aviso", "Oi");
+    /// dialog.set_styles(Styles::default());
+    /// assert_eq!(dialog.buttons, ["OK"]);
+    /// ```
+    pub fn set_styles(&mut self, styles: Styles) {
+        self.styles = styles;
     }
 
     /// Moves the selection to the next button.
@@ -241,8 +262,10 @@ impl Dialog {
 
     /// Renders the dialog as a box, centered in `width` columns.
     ///
-    /// A `width` of `0` skips the horizontal centering and returns the box
-    /// alone.
+    /// When `width` is greater than zero, the content is wrapped so the output
+    /// never exceeds `width` columns. A short dialog keeps its natural width
+    /// and is then centered. A `width` of `0` skips the centering and applies
+    /// no limit.
     ///
     /// ```
     /// use charm_dialog::Dialog;
@@ -253,19 +276,101 @@ impl Dialog {
     /// assert!(out.contains("Yes"));
     /// ```
     pub fn render(&self, width: usize) -> String {
+        let boxed = self.render_box(width);
+        if width > 0 {
+            lipgloss::place_horizontal(to_i32(width), lipgloss::CENTER, &boxed, &[])
+        } else {
+            boxed
+        }
+    }
+
+    /// Renders the dialog centered both vertically and horizontally inside a
+    /// `width` x `height` area, so it can be drawn over an existing screen.
+    ///
+    /// The result has exactly `height` lines, joined by `\n` with no trailing
+    /// newline, and no line is wider than `width`. When the dialog is taller
+    /// than the area, it is truncated. A `height` of `0` returns an empty
+    /// string.
+    ///
+    /// ```
+    /// use charm_dialog::Dialog;
+    ///
+    /// let dialog = Dialog::new_alert("Info", "Mensagem de teste");
+    /// let out = dialog.render_overlay(80, 24);
+    /// assert_eq!(out.matches('\n').count(), 23);
+    /// assert!(charm_core::strip_ansi(&out).contains("Mensagem de teste"));
+    /// ```
+    pub fn render_overlay(&self, width: usize, height: usize) -> String {
+        if height == 0 {
+            return String::new();
+        }
+
+        let boxed = self.render_box(width);
+        let mut lines: Vec<&str> = boxed.split('\n').collect();
+        lines.truncate(height);
+
+        let top_pad = if height > lines.len() {
+            (height - lines.len()) / 2
+        } else {
+            0
+        };
+        let bottom_pad = height - lines.len() - top_pad;
+
+        let dialog_width = block_width(&lines.join("\n"));
+        let left_pad = if width > dialog_width {
+            " ".repeat((width - dialog_width) / 2)
+        } else {
+            String::new()
+        };
+        let blank_line = " ".repeat(width);
+
+        let mut out: Vec<String> = Vec::with_capacity(height);
+        out.extend((0..top_pad).map(|_| blank_line.clone()));
+        out.extend(lines.iter().map(|line| format!("{left_pad}{line}")));
+        out.extend((0..bottom_pad).map(|_| blank_line.clone()));
+        out.join("\n")
+    }
+
+    /// Renders the bordered box, limiting its total width to `max_width` when
+    /// that is greater than zero. The limit is applied to the inner blocks, so
+    /// long messages wrap instead of overflowing.
+    fn render_box(&self, max_width: usize) -> String {
+        let frame =
+            usize::try_from(self.styles.border_style.get_horizontal_frame_size()).unwrap_or(0);
+
+        let mut content = self.render_content(0);
+        if max_width > 0 && block_width(&content) + frame > max_width {
+            let inner = max_width.saturating_sub(frame).max(1);
+            content = self.render_content(inner);
+        }
+
+        self.styles.border_style.render(&content)
+    }
+
+    /// Builds the inner content (title, body, buttons) without the border.
+    ///
+    /// When `inner` is greater than zero, each block is limited to that width.
+    fn render_content(&self, inner: usize) -> String {
         let styles = &self.styles;
 
-        let title = styles.title_style.render(&self.title);
+        let mut title_style = styles.title_style.clone();
+        let mut message_style = styles.message_style.clone();
+        if inner > 0 {
+            let width = to_i32(inner);
+            title_style = title_style.width(width);
+            message_style = message_style.width(width);
+        }
+
+        let title = title_style.render(&self.title);
 
         let body = if self.r#type == DialogType::Input {
-            let prompt = styles.message_style.render(&self.input_prompt);
-            let input = Style::new()
+            let input_line = Style::new()
                 .foreground(color("#FAFAFA"))
                 .underline(true)
                 .render(&format!("{}_", self.input_value));
-            format!("{prompt}\n{input}")
+            pad_block(&message_style.render(&format!("{}\n{input_line}", self.input_prompt)))
         } else {
-            styles.message_style.render(&self.message)
+            pad_block(&message_style.render(&self.message))
         };
 
         let buttons: Vec<String> = self
@@ -281,66 +386,12 @@ impl Dialog {
             })
             .collect();
         let button_refs: Vec<&str> = buttons.iter().map(String::as_str).collect();
-        let buttons_row = lipgloss::join_horizontal(lipgloss::CENTER, &button_refs);
-
-        let content = lipgloss::join_vertical(lipgloss::CENTER, &[&title, &body, "", &buttons_row]);
-        let boxed = styles.border_style.render(&content);
-
-        if width > 0 {
-            lipgloss::place_horizontal(
-                i32::try_from(width).unwrap_or(i32::MAX),
-                lipgloss::CENTER,
-                &boxed,
-                &[],
-            )
-        } else {
-            boxed
-        }
-    }
-
-    /// Renders the dialog centered both vertically and horizontally inside a
-    /// `width` x `height` area, so it can be drawn over an existing screen.
-    ///
-    /// Each returned line is terminated by `\n`. The dialog is shifted down
-    /// by half of the free vertical space and each line is padded on the
-    /// left to be horizontally centered.
-    ///
-    /// ```
-    /// use charm_dialog::Dialog;
-    ///
-    /// let dialog = Dialog::new_alert("Info", "Mensagem de teste");
-    /// let out = dialog.render_overlay(80, 24);
-    /// assert!(charm_core::strip_ansi(&out).contains("Mensagem de teste"));
-    /// ```
-    pub fn render_overlay(&self, width: usize, height: usize) -> String {
-        let rendered = self.render(0);
-
-        let lines = rendered.matches('\n').count() + 1;
-        let top_pad = if height > lines {
-            (height - lines) / 2
-        } else {
-            0
-        };
-
-        let mut out = String::new();
-        for _ in 0..top_pad {
-            out.push_str(&" ".repeat(width));
-            out.push('\n');
+        let mut buttons_row = lipgloss::join_horizontal(lipgloss::CENTER, &button_refs);
+        if inner > 0 {
+            buttons_row = pad_block(&Style::new().width(to_i32(inner)).render(&buttons_row));
         }
 
-        for line in rendered.split('\n') {
-            let line_width = lipgloss::utils::width_visible(line);
-            let pad = if width > line_width {
-                (width - line_width) / 2
-            } else {
-                0
-            };
-            out.push_str(&" ".repeat(pad));
-            out.push_str(line);
-            out.push('\n');
-        }
-
-        out
+        lipgloss::join_vertical(lipgloss::CENTER, &[&title, &body, "", &buttons_row])
     }
 
     fn build(kind: DialogType, title: &str, message: &str, buttons: &[&str]) -> Self {
@@ -355,6 +406,33 @@ impl Dialog {
             styles: Styles::default(),
         }
     }
+}
+
+/// Widest visible line of a multi-line block, like Go's `lipgloss.Width`.
+fn block_width(text: &str) -> usize {
+    text.split('\n')
+        .map(lipgloss::utils::width_visible)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Pads every line of a multi-line block with spaces up to the block width, so
+/// that a later centering moves the block as a whole. Go's `lipgloss` does this
+/// inside `Render`; the Rust port does not.
+fn pad_block(text: &str) -> String {
+    let width = block_width(text);
+    text.split('\n')
+        .map(|line| {
+            let padding = width.saturating_sub(lipgloss::utils::width_visible(line));
+            format!("{line}{}", " ".repeat(padding))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Converts a width to the `i32` used by `lipgloss`, saturating at `i32::MAX`.
+fn to_i32(value: usize) -> i32 {
+    i32::try_from(value).unwrap_or(i32::MAX)
 }
 
 /// Builds a [`lipgloss::Color`] from a hex string such as `"#7D56F4"`.

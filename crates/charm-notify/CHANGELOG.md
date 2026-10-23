@@ -25,6 +25,12 @@ Synchronised with the Go `charm-notify` library.
   of the `msg` fallback, the escaping of adversarial payloads and the
   platform capabilities. The command tests of Linux and macOS now run on any
   host.
+* `Error::BinaryNotFound` for `notify-send` now says how to install
+  `libnotify` (`apt install libnotify-bin`), as the Go original does. The enum
+  shape is unchanged; only the message is different.
+* Tests for the options each backend ignores: the icon on macOS and on the
+  `msg` fallback, and the timeout on BurntToast. Also a test that a successful
+  command is reported as `Ok`.
 
 ### Changed
 

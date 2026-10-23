@@ -2,16 +2,16 @@
 
 > [Read in English](README.md)
 
-Uma ferramenta de linha de comando que renderiza CSV, TSV, JSON e JSON Lines como
-tabelas estilizadas no terminal, usando o [lipgloss](https://crates.io/crates/lipgloss)
+Uma ferramenta de linha de comando que renderiza CSV, TSV, JSON e JSON Lines
+como tabelas estilizadas no terminal, usando [lipgloss](https://crates.io/crates/lipgloss)
 para o estilo.
 
-Esta crate e um port em Rust do comando Go
+Esta crate é um port Rust do comando Go
 [`github.com/junhinhow/charm-table-cli`](https://github.com/junhinhow/charm-table-cli).
-A crate se chama `charm-table-cli`, mas o binario instalado se chama
+A crate se chama `charm-table-cli`, mas o binário instalado se chama
 **`charm-table`**.
 
-## Instalacao
+## Instalação
 
 ```bash
 cargo install --git https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust charm-table-cli
@@ -28,45 +28,54 @@ charm-table dados.csv
 # A partir de um pipe
 cat dados.csv | charm-table
 
-# Outros estilos e opcoes
+# Outros estilos e opções
 charm-table --style thick --color "#ff0000" dados.csv
 charm-table --no-header --max-width 60 dados.csv
 ```
 
-O formato de entrada e detectado automaticamente:
+O formato da entrada é detectado automaticamente:
 
-| A entrada comeca com | Formato |
+| A entrada começa com | Formato |
 |---|---|
-| `[` | Array JSON de objetos. As chaves do primeiro objeto viram as colunas. |
+| `[` | Array JSON de objetos. As colunas são as chaves de todos os objetos. |
 | `{` | JSON Lines: um objeto por linha. |
-| qualquer outro caractere | Texto delimitado. Separado por tab quando a primeira linha tem tab; senao, por virgula. |
+| qualquer outra coisa | Texto delimitado. Separado por tabulação quando a primeira linha tem tabulação fora de aspas; por vírgula caso contrário. |
 
-Para texto delimitado, a primeira linha e o cabecalho por padrao. Com
-`--no-header`, as colunas se chamam `Col1`, `Col2`, e assim por diante.
+Em texto delimitado, a primeira linha é o cabeçalho por padrão. Com
+`--no-header`, as colunas recebem os nomes `Col1`, `Col2`, e assim por diante,
+em todos os formatos.
 
 ## Flags
 
-| Flag | Tipo | Padrao | Descricao |
+| Flag | Tipo | Padrão | Descrição |
 |---|---|---|---|
 | `--style <ESTILO>` | `rounded`, `thick`, `double`, `ascii` | `rounded` | Estilo da borda. |
-| `--header` / `--no-header` | chave | `--header` | Usa a primeira linha como cabecalho, ou gera `Col1`, `Col2`, ... |
-| `--max-width <N>` | inteiro | `0` | Reduz as colunas para caber em cerca de `N` caracteres. `0` significa sem limite. |
-| `--color <COR>` | indice ANSI ou hex | `63` | Cor do cabecalho: indice ANSI 256 (`63`) ou hex (`#ff0000`). |
-| `[ARQUIVO]` | caminho | stdin | Arquivo de entrada. Sem ele, a entrada e lida do stdin. |
+| `--header` / `--no-header` | interruptor | `--header` | Usa a primeira linha como cabeçalho, ou gera `Col1`, `Col2`, ... |
+| `--max-width <N>` | inteiro | `0` | Largura máxima da tabela em colunas, bordas incluídas. `0` significa sem limite. |
+| `--color <COR>` | índice ANSI ou hex | `63` | Cor do cabeçalho: índice ANSI de 256 cores (`63`) ou hex (`#ff0000`). |
+| `[ARQUIVO]` | caminho | stdin | Arquivo de entrada. Sem ele, a entrada é lida do stdin. |
 | `-h`, `--help` | | | Mostra a ajuda. |
-| `-V`, `--version` | | | Mostra a versao. |
+| `-V`, `--version` | | | Mostra a versão. |
 
 ### Estilos de borda
 
-| `--style` | Caracteres | Cantos de exemplo |
+| `--style` | Caracteres | Exemplo de cantos |
 |---|---|---|
 | `rounded` | `─│╭╮╰╯` | `╭ ╮ ╰ ╯` |
 | `thick` | `━┃┏┓┗┛` | `┏ ┓ ┗ ┛` |
 | `double` | `═║╔╗╚╝` | `╔ ╗ ╚ ╝` |
-| `ascii` | `─│┌┐└┘` | `┌ ┐ └ ┘` |
+| `ascii` | `-\|+` | `+` |
 
-`ascii` desenha linhas simples, como no original em Go. Ele nao usa `+`, `-` e
-`|`.
+`ascii` usa caracteres ASCII simples, então funciona em terminais sem os
+desenhos de caixa do Unicode:
+
+```text
++-------+-------+
+| nome  | idade |
++-------+-------+
+| Ana   | 31    |
++-------+-------+
+```
 
 ## Exemplo
 
@@ -78,7 +87,7 @@ Ana,31,Recife
 Bruno,27,Salvador
 ```
 
-Comando e saida (codigos ANSI removidos):
+Comando e saída (códigos ANSI removidos):
 
 ```text
 $ charm-table pessoas.csv
@@ -90,22 +99,86 @@ $ charm-table pessoas.csv
 ╰───────┴───────┴──────────╯
 ```
 
-Esta e a saida real da ferramenta, e ela bate com o original em Go. Cada
-coluna tem a largura do seu maior valor, mais um espaco de padding de cada lado,
-entao cada linha fica em uma unica linha e as bordas ficam alinhadas.
+Cada coluna tem a largura do maior valor, mais um espaço de preenchimento de
+cada lado, então cada linha fica em uma única linha e as bordas se alinham. A
+tabela é seguida de uma linha em branco, como no original em Go.
 
-Execute a demo para ver todos os estilos de borda:
+Execute a demonstração para ver todos os estilos de borda:
 
 ```bash
 cargo run -p charm-table-cli --example charm_table_cli_demo
 ```
 
+## Comportamento
+
+### Ordem das colunas (JSON e JSON Lines)
+
+As colunas são a união das chaves de **todos** os registros, então nenhuma
+coluna é descartada. Dentro de cada registro, as chaves são ordenadas em ordem
+alfabética, e as chaves que só aparecem em registros posteriores são
+acrescentadas. A mesma entrada sempre produz a mesma tabela.
+
+```bash
+echo '[{"nome":"Alice","idade":30},{"nome":"Bob","cidade":"LA"}]' | charm-table
+```
+
+### Registros irregulares (CSV e TSV)
+
+Linhas com quantidade diferente de campos não interrompem o programa: a tabela
+cresce até o registro mais largo e as células que faltam ficam vazias.
+
+```bash
+printf 'a,b,c\n1,2\n3,4,5,6\n' | charm-table
+```
+
+### `--max-width`
+
+O limite inclui as bordas e o preenchimento das células. As colunas mais largas
+são reduzidas a um teto comum e, depois, qualquer célula sobrando é devolvida,
+então a tabela cabe no limite sempre que isso for possível. Um limite pequeno
+demais até para as bordas é reportado como erro (código de saída 1), em vez de
+produzir uma tabela quebrada:
+
+```text
+$ printf 'a,b,c\n1,2,3\n' | charm-table --max-width 8
+Erro: largura maxima 8 insuficiente para 3 colunas: sao necessarias ao menos 13 colunas
+```
+
+Células que não cabem terminam com `...` quando há pelo menos 4 colunas
+disponíveis, e são cortadas sem reticências caso contrário.
+
+### Largura do texto
+
+As larguras das colunas são medidas em **células do terminal**, não em bytes
+nem em caracteres. Caracteres CJK e emojis ocupam duas células, então
+continuam alinhados. Quebras de linha e tabulações dentro de uma célula são
+trocadas por espaços, para que a célula não quebre o layout.
+
+### Valores
+
+- Strings são mostradas como estão; `null` e chaves ausentes viram células vazias.
+- Booleanos são `true` e `false`.
+- Números usam a forma decimal mais curta que volta ao mesmo valor, nunca em
+  notação exponencial: `1e-7` vira `0.0000001` e `1e21` vira
+  `1000000000000000000000`.
+- Arrays e objetos são mostrados como JSON compacto com chaves ordenadas, e
+  `<`, `>` e `&` são escapados como `\u003c`, `\u003e`, `\u0026`.
+
+### Limites e mensagens da entrada
+
+- Um registro JSON Lines pode ter até 16 MiB. Uma linha maior é um erro.
+- Um byte order mark (BOM) no início é ignorado.
+- Entrada só com espaços em branco é um erro (`entrada vazia`).
+- Os erros são impressos no stderr como `Erro: ...`, com código de saída 1.
+
 ## Paridade com o original em Go
 
-A saida e comparada com um golden file gerado pelo programa Go
-(`reference/go/charm-table-cli/cmd/parity`). O golden cobre entrada CSV, TSV,
-array JSON e JSON Lines, todos os estilos de borda, `--no-header`,
-`--max-width` e `--color`.
+A saída é comparada com um golden file gerado pelo programa Go
+(`reference/go/charm-table-cli/cmd/parity`). Esse programa compila o binário
+real e o executa com a mesma matriz de entradas e flags dos testes de
+integração em Rust. O golden file cobre entrada CSV, TSV, array JSON e JSON
+Lines, todos os estilos de borda, `--no-header`, `--max-width`, `--color`,
+linhas irregulares, tabulação dentro de aspas e caracteres largos.
 
 ```bash
 cargo run -p charm-parity --bin parity -- gen \
@@ -115,37 +188,20 @@ cargo run -p charm-parity --bin parity -- gen \
 cargo test -p charm-table-cli
 ```
 
-## Diferencas conhecidas
+## Diferenças conhecidas
 
-| Go | Rust | Observacao |
+| Go | Rust | Observações |
 |---|---|---|
-| binario `charm-table-cli` | binario `charm-table` | A crate tem nome diferente do binario. |
-| `-style thick`, `-header=false` (um hifen) | `--style thick`, `--no-header` | A CLI em Rust usa clap, que aceita apenas dois hifens. |
-| `-style nope` cai para `rounded` | Erro, codigo de saida 2 | Valores invalidos sao recusados em vez de substituidos em silencio. |
-| Colunas de um objeto JSON em ordem aleatoria (iteracao de map no Go) | Colunas na ordem do documento do primeiro registro | A ordem aleatoria nao pode ser reproduzida. |
-| TSV com celula vazia no meio (`1\t\t3`) falha com `wrong number of fields` | Lido como tres campos | No Go, `TrimLeadingSpace` tambem consome os tabs delimitadores, e o campo vazio some. |
-| Texto de erro do leitor CSV: `record on line 4: wrong number of fields` | `record N (line: L, byte: B): found record with X fields, ...` | Os prefixos dos erros batem; o detalhe vem da crate `csv`. |
-| Cores ANSI indexadas (`38;5;63`) | Sequencias truecolor (`38;2;95;95;255`) | O `lipgloss` converte indices para RGB. A cor exibida e a mesma. |
-| `bufio.Scanner` para em linhas de 64 KB no JSON Lines | Sem limite de linha | O limite do Go e do scanner, nao uma funcionalidade. |
-| UTF-8 invalido e repassado | Substituido por U+FFFD | Strings em Rust precisam ser UTF-8 valido. |
+| binário `charm-table-cli` | binário `charm-table` | A crate tem nome diferente do binário. |
+| `-style thick`, `-header=false` (traço simples) | `--style thick`, `--no-header` | A CLI Rust usa clap, que aceita apenas dois traços. |
+| `-style nope` volta para `rounded` | Erro, código de saída 2 | Valores inválidos são rejeitados em vez de substituídos em silêncio. |
+| Aspas soltas dentro de um campo (`LazyQuotes` do Go) | Interpretadas pelo crate `csv` | Aspas malformadas podem dar um valor de célula diferente. |
+| Texto de erro do leitor CSV: `record on line 4: ...` | `record N (line: L, byte: B): ...` | O prefixo `erro ao ler dados CSV` coincide; o detalhe vem do crate `csv`. |
+| Cores ANSI indexadas (`38;5;63`) | Sequências truecolor (`38;2;95;95;255`) | O `lipgloss` converte cores indexadas para RGB. A cor exibida é a mesma. |
+| UTF-8 inválido passa adiante | Substituído por U+FFFD | Strings Rust precisam ser UTF-8 válido. |
+| Largura medida pela biblioteca de terminal (`ansi.StringWidth`) | Largura medida com `unicode-width`, caractere a caractere | Algumas sequências de emoji (ZWJ, seletores de variação) podem ter largura diferente. |
+| Mensagens de erro com acentos (`não`, `é`) | As mesmas mensagens sem acentos (`nao`, `e`) | O código-fonte é ASCII. A redação segue as mensagens do Go. |
 
-### Herdado do original em Go
-
-Estes comportamentos sao reproduzidos de proposito, para manter a paridade:
-
-- **`--max-width` e aproximado.** Cada coluna perde a mesma parte do excesso e
-  nunca fica abaixo de 3 caracteres, entao uma tabela muito estreita ainda pode
-  ser mais larga que o limite.
-- **Os tamanhos sao contados em caracteres** (escalares Unicode, as runas do Go).
-  Eles nao sao colunas de exibicao do terminal, entao caracteres largos como CJK
-  ou emoji podem desalinhar a tabela. Isso e igual ao Go.
-- **O corte de `--max-width`** termina a celula com `...` quando cabem pelo menos
-  4 caracteres, e corta o texto sem reticencias caso contrario.
-- **Numeros** usam a formatacao `%g` do Go: `1e-07`, `1.23456785e+07`. Inteiros
-  que cabem em 64 bits saem sem ponto decimal. Arrays e objetos aninhados sao
-  codificados como JSON compacto, com chaves ordenadas e `<`, `>`, `&` escapados
-  como `\u003c`, `\u003e`, `\u0026`.
-
-## Licenca
+## Licença
 
 MIT

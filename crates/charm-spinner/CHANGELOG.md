@@ -5,6 +5,35 @@ All notable changes to this crate are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The 12 spinners added to the Go original since 0.1.0: `beach()`, `bouncingbar()`,
+  `cat()`, `diamond()`, `digits()`, `ellipsis()`, `hexagon()`, `money()`,
+  `music()`, `quotes()`, `rectangle()` and `target()`. The crate now has 42
+  spinners and 257 frames.
+- `Spinner::style: Option<Style>` and `Spinner::with_style`, mirroring the Go
+  `Spinner.Style` field. A spinner without a style (or with an empty one) uses
+  the package default style.
+- `set_default_style`, which replaces the package default style at run time,
+  safely while other threads render. Mirrors the Go `SetDefaultStyle`.
+- `names()`, the sorted list of spinner names (Go `Names`).
+- `reference/go/charm-spinner/cmd/parity`, the Go program that generates the
+  golden files.
+
+### Changed
+
+- `Spinner` derives `Debug` and `Clone` and implements `PartialEq`/`Eq` by
+  hand: `lipgloss::Style` does not implement `PartialEq`. Two spinners are
+  equal when their frames, interval and style are equivalent.
+- Struct literals of `Spinner` need the new `style` field (`style: None`).
+  `Spinner::new` is unchanged.
+- `DEFAULT_STYLE` is now the built-in default and the initial value of the
+  package default. `default_style()` returns the current one.
+- Golden files regenerated from the updated Go reference (42 spinners,
+  257 frames).
+
 ## [0.1.0]
 
 ### Added

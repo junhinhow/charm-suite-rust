@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Synchronised with the Go `charm-charts` package after its layout fixes.
+
+### Changed
+
+* `Sparkline`: the label is printed on the first row only; the other rows of a
+  multi-row chart are indented to keep the columns aligned.
+* `Sparkline`: fewer data points than columns are expanded by linear
+  interpolation, as in Go. `width` is clamped to `1..=500` by the setter, so
+  `width(0)` renders one column instead of an empty string.
+* `BarChart`: the horizontal layout reserves the label and value columns out of
+  the requested `width`. Values use one decimal place (`%.1f`).
+* `BarChart`: the vertical layout prints the values above the columns when
+  `show_values` is on, shrinks the columns to honor `width`, and clamps
+  `bar_width` to `1..=20`. Vertical charts have one more row when values are
+  shown.
+* `BarChart`: labels are fitted by display width and end with `…` when cut.
+  They are no longer cut by bytes, so the output never contains `U+FFFD`.
+* `BarChart::width` is clamped to `1..=500`, and `bar_width` to `1..=20`
+  (`bar_width(0)` renders one row instead of nothing).
+* `ProgressBar::width` is clamped to `0..=500`. `render` also clamps a `value`
+  assigned directly to the public field.
+
+### Added
+
+* Unit tests ported from the Go `chart_test.go` suite.
+* The parity golden file is regenerated from the Go `cmd/parity` program.
+
 ## [0.1.0] - 2026-10-22
 
 ### Added

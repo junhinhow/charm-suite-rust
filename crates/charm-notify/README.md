@@ -16,7 +16,8 @@ library. It shows a native notification on Windows, macOS and Linux.
 > | macOS | `osascript` | Ships with macOS |
 > | Linux | `notify-send` | Install `libnotify` (e.g. `apt install libnotify-bin`) |
 >
-> If the program is missing, [`send`] returns `Error::BinaryNotFound`.
+> If the program is missing, [`send`] returns `Error::BinaryNotFound`. For
+> `notify-send` the message also says how to install `libnotify`.
 
 ## Installation
 
@@ -146,8 +147,6 @@ is not installed"), so the real cause is never lost.
   Portuguese.
 * The `Notification::builder()` shape from the roadmap is not used: the public
   API is `NotifyOptions`, as in the Go `Option` functions.
-* The Linux "not found" error has no installation hint in its message; the
-  hint is in the table above.
 * The Go `Send` takes functional options and skips `nil` ones; the Rust
   `send` takes a `&NotifyOptions` value, so there is no `nil` case.
 * Go's `ErrCommandNotFound` and `ErrMultilineText` sentinels are replaced by

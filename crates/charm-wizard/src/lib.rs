@@ -4,7 +4,8 @@
 //! [`charm-wizard`](https://github.com/junhinhow/charm-suite). A [`Wizard`]
 //! runs a sequence of [`Step`]s that share a [`DataMap`], supports moving
 //! backward and forward, and prints a styled progress indicator with
-//! [`render_progress`].
+//! [`render_progress`]. Going back undoes the data written by the step being
+//! left, and a failed step blocks [`Wizard::forward`].
 //!
 //! # Examples
 //!
@@ -36,6 +37,9 @@
 
 mod progress;
 mod wizard;
+
+#[cfg(test)]
+mod tests;
 
 pub use progress::render_progress;
 pub use wizard::{DataMap, Step, StepFn, Wizard};

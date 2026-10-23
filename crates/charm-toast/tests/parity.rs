@@ -47,18 +47,58 @@ fn build_report() -> String {
         let _ = writeln!(out, "{}", toast.render(40));
     }
 
+    for width in [2, 5, 12, 24] {
+        let long = Toast::new(
+            "Mensagem bem longa para caber em poucas colunas",
+            Duration::from_secs(60),
+        )
+        .with_type(ToastType::Warning);
+        let _ = writeln!(out, "== truncate width={width} ==");
+        let _ = writeln!(out, "{}", long.render(width));
+    }
+
+    let persistent = Toast::new("persistente", Duration::ZERO);
+    let _ = writeln!(
+        out,
+        "persistent={} expires_zero={} remaining_ms={}",
+        persistent.persistent(),
+        persistent.expires_at().is_none(),
+        persistent.remaining().as_millis()
+    );
+
     let mut manager = ToastManager::new();
     manager.add_info("Notificacao 1", Duration::from_secs(60));
     manager.add_success("Notificacao 2", Duration::from_secs(60));
     manager.add_warning("Aviso", Duration::from_secs(60));
     manager.add_error("Erro", Duration::from_secs(60));
-    let _ = writeln!(out, "count={} max={}", manager.count(), manager.max_visible);
+    let _ = writeln!(
+        out,
+        "count={} max={} next_expiry_positive={}",
+        manager.count(),
+        manager.max_visible(),
+        manager.next_expiry() > Duration::ZERO
+    );
     let _ = writeln!(out, "== manager ==");
     let _ = writeln!(out, "{}", manager.render(60));
 
-    manager.max_visible = 2;
+    manager.set_max_visible(2);
     let _ = writeln!(out, "== manager max=2 ==");
     let _ = writeln!(out, "{}", manager.render(60));
+
+    let messages: Vec<String> = manager.toasts().into_iter().map(|t| t.message).collect();
+    let _ = writeln!(out, "== toasts ==\n{}", messages.join(","));
+
+    let id = manager.toasts()[0].id.clone();
+    let _ = writeln!(
+        out,
+        "update={}",
+        manager.update(&id, |t| t.with_message("Erro atualizado"))
+    );
+    let _ = writeln!(out, "== manager updated ==");
+    let _ = writeln!(out, "{}", manager.render(60));
+    let removed = manager.remove(&id);
+    let _ = writeln!(out, "remove={} count={}", removed, manager.count());
+    let _ = writeln!(out, "remove_again={}", manager.remove(&id));
 
     manager.clear();
     let _ = writeln!(out, "== manager empty ==");

@@ -1,12 +1,12 @@
 //! Terminal charts for the Charm Suite: sparklines, bar charts and progress
 //! bars.
 //!
-//! The crate is a faithful port of the Go `charm-charts` library and keeps the
-//! original rendering algorithm byte-for-byte compatible (after ANSI codes are
-//! stripped). Every component follows the same shape:
+//! The crate is a faithful port of the Go `charm-charts` library. The layout
+//! algorithms follow the Go original, so the output is identical after the
+//! ANSI escape codes are stripped. Every component follows the same shape:
 //!
 //! * a `new` constructor returning the default configuration;
-//! * chainable `with_*`-style setters that consume `self` and return `Self`;
+//! * chainable setters that consume `self` and return `Self`;
 //! * a `render` method producing the styled string.
 //!
 //! # Examples
@@ -29,15 +29,15 @@
 //!
 //! # Known differences from the Go original
 //!
-//! * The Go implementation panics when a [`Sparkline`] is rendered with a
-//!   `width` of `0` (it indexes an empty resampled slice). This port returns an
-//!   empty string instead.
 //! * The Go implementation panics when a [`ProgressBar`] has a negative
 //!   `value` assigned directly to the public field. This port clamps the value
 //!   to the `0.0..=1.0` range instead.
+//! * The Go implementation panics when a [`BarChart`] is rendered vertically
+//!   with a `bar_width` larger than the column that `width` leaves for it. This
+//!   port shrinks the bar to the column instead.
 //!
-//! [`Sparkline`]: crate::Sparkline
 //! [`ProgressBar`]: crate::ProgressBar
+//! [`BarChart`]: crate::BarChart
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -123,41 +123,55 @@ pub(crate) fn go_min(x: f64, y: f64) -> f64 {
     }
 }
 
-/// Converts a `usize` into an `i64`, saturating instead of wrapping around.
-pub(crate) fn to_i64(value: usize) -> i64 {
-    i64::try_from(value).unwrap_or(i64::MAX)
+/// Display width of `text` in terminal columns, ignoring ANSI codes.
+pub(crate) fn display_width(text: &str) -> usize {
+    charm_core::display_width(text)
 }
 
-/// Pads `text` to `width` characters, mirroring Go's `fmt` verbs.
-///
-/// Go's `fmt` counts **runes** (not bytes) when padding strings, so
-/// `format!("{:<8}", "é")` produces two spaces plus the two-byte character
-/// (three cells wide in total). When `left_align` is `true` the padding is
-/// appended (Go's `%-*s`), otherwise it is prepended (Go's `%*s`).
-pub(crate) fn pad_like_go(text: &str, width: usize, left_align: bool) -> String {
-    let len = text.chars().count();
-    if len >= width {
+/// Pads `text` with spaces on the left until it spans `width` columns.
+pub(crate) fn pad_left(text: &str, width: usize) -> String {
+    let current = display_width(text);
+    if current >= width {
         return text.to_owned();
     }
-    let padding = " ".repeat(width - len);
-    if left_align {
-        format!("{text}{padding}")
-    } else {
-        format!("{padding}{text}")
-    }
+    format!("{}{text}", " ".repeat(width - current))
 }
 
-/// Truncates `text` to at most `bytes` **bytes**, mirroring Go's slice syntax.
-///
-/// Go slices strings by byte index and may therefore cut a multi-byte
-/// character in half, producing an invalid UTF-8 sequence. This port keeps the
-/// byte-oriented semantics but converts the result with
-/// [`String::from_utf8_lossy`], so the returned string is always valid UTF-8.
-pub(crate) fn truncate_bytes(text: &str, bytes: usize) -> String {
-    if text.len() <= bytes {
+/// Centers `text` in `width` columns. The extra column of an odd gap goes to
+/// the right, like the Go original.
+pub(crate) fn center(text: &str, width: usize) -> String {
+    let current = display_width(text);
+    if current >= width {
         return text.to_owned();
     }
-    String::from_utf8_lossy(&text.as_bytes()[..bytes]).into_owned()
+    let left = (width - current) / 2;
+    let right = width - current - left;
+    format!("{}{text}{}", " ".repeat(left), " ".repeat(right))
+}
+
+/// Shortens `text` to fit `width` columns, ending it with `…` when it is cut.
+///
+/// The cut never splits a character.
+pub(crate) fn fit_label(text: &str, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    if display_width(text) <= width {
+        return text.to_owned();
+    }
+    if width == 1 {
+        return "…".to_owned();
+    }
+    format!("{}…", truncate_chars(text, width - 1))
+}
+
+/// Drops characters from the end until the text fits `width` columns.
+fn truncate_chars(text: &str, width: usize) -> String {
+    let mut chars: Vec<char> = text.chars().collect();
+    while !chars.is_empty() && display_width(&chars.iter().collect::<String>()) > width {
+        chars.pop();
+    }
+    chars.into_iter().collect()
 }
 
 #[cfg(test)]
@@ -183,18 +197,31 @@ mod tests {
     }
 
     #[test]
-    fn pad_like_go_counts_runes() {
-        assert_eq!(pad_like_go("ab", 5, false), "   ab");
-        assert_eq!(pad_like_go("ab", 5, true), "ab   ");
-        assert_eq!(pad_like_go("abcdef", 3, false), "abcdef");
-        assert_eq!(pad_like_go("é", 3, true), "é  ");
+    fn pad_left_measures_display_width() {
+        assert_eq!(pad_left("ab", 5), "   ab");
+        assert_eq!(pad_left("abcdef", 3), "abcdef");
+        assert_eq!(pad_left("日本", 6), "  日本");
     }
 
     #[test]
-    fn truncate_bytes_keeps_valid_utf8() {
-        assert_eq!(truncate_bytes("abc", 2), "ab");
-        assert_eq!(truncate_bytes("abc", 5), "abc");
-        // Cuts a multi-byte character in half, like the Go original.
-        assert_eq!(truncate_bytes("é", 1), "\u{fffd}");
+    fn center_gives_the_extra_column_to_the_right() {
+        assert_eq!(center("ab", 5), " ab  ");
+        assert_eq!(center("abc", 4), "abc ");
+    }
+
+    #[test]
+    fn fit_label_keeps_short_text_and_cuts_long_text() {
+        assert_eq!(fit_label("Go", 10), "Go");
+        assert_eq!(fit_label("abcdef", 4), "abc…");
+        assert_eq!(fit_label("abcdef", 1), "…");
+        assert_eq!(fit_label("abcdef", 0), "");
+    }
+
+    #[test]
+    fn fit_label_never_splits_a_character() {
+        for (text, width) in [("Programação", 5), ("日本語", 4), ("Ação", 3)] {
+            let fitted = fit_label(text, width);
+            assert!(display_width(&fitted) <= width, "{fitted:?} too wide");
+        }
     }
 }

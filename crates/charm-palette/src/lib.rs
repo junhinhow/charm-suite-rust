@@ -5,7 +5,8 @@
 //! It is a faithful port of the Go `charm-palette` library.
 //!
 //! Every function returns a plain `String` containing ANSI escape sequences;
-//! the caller decides where to print it.
+//! the caller decides where to print it. The `try_*` variants return an
+//! [`Error`] instead of an empty string when the input is invalid.
 //!
 //! # Examples
 //!
@@ -19,88 +20,48 @@
 //!
 //! # Known differences from the Go original
 //!
-//! * The Go implementation receives `image/color.Color` values and reads them
-//!   through `RGBA()`, which returns **premultiplied** channels. This port uses
-//!   the raw channels of [`Rgb`] instead, so the swatches keep the colour the
-//!   caller asked for. For fully opaque colours — the common case — both
-//!   implementations produce exactly the same output.
-//! * The hexadecimal label rendered next to a swatch always shows the opaque
-//!   `#rrggbb` triplet, even for translucent colours.
+//! * The Go implementation receives `image/color.Color` values. This port takes
+//!   [`charm_core::Rgb`], which cannot be nil, so there is no `ErrNilColor`
+//!   counterpart.
+//! * The Go `*Err` functions are the `try_*` functions here, and they return
+//!   [`Error`] instead of `error`.
+//! * [`try_show_true_color`] reports [`Error::InvalidDimensions`] where the Go
+//!   `ShowTrueColorErr` reports `ErrInvalidWidth`.
+//! * [`compare_themes`] takes the themes without names. The Go function does
+//!   not use names either; the columns are titled by position.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-use std::collections::BTreeMap;
+mod error;
+
+use std::collections::{BTreeMap, BTreeSet};
 
 use charm_core::Rgb;
 use lipgloss::{Color, Style};
 
-/// Converts a `usize` into an `i32`, saturating instead of wrapping around.
-fn cells(width: usize) -> i32 {
-    i32::try_from(width).unwrap_or(i32::MAX)
-}
+pub use error::Error;
 
-/// Renders `text` centered inside a block of `width` cells.
-///
-/// This reproduces the exact layout of the Go lipgloss, which differs from the
-/// Rust `lipgloss` port in two subtle ways:
-///
-/// * the Go implementation gives the extra cell of an odd gap to the **right**
-///   side (`left = gap / 2`), while the Rust port rounds the left padding up;
-/// * the Go implementation styles the padding with the *whitespace* style
-///   (the background colour, when there is one), while the Rust port leaves
-///   the padding unstyled.
-///
-/// * `style` styles the content;
-/// * `whitespace` styles the padding.
-fn render_centered(text: &str, width: usize, style: &Style, whitespace: &Style) -> String {
-    let lines = wrap_text(text, width);
-    let widest = lines.iter().map(|l| l.chars().count()).max().unwrap_or(0);
-
-    let mut out = String::new();
-    for (i, line) in lines.iter().enumerate() {
-        let gap = width.max(widest).saturating_sub(line.chars().count());
-        let left = gap / 2;
-        let right = gap - left;
-
-        if left > 0 {
-            out.push_str(&whitespace.render(&" ".repeat(left)));
-        }
-        out.push_str(&style.render(line));
-        if right > 0 {
-            out.push_str(&whitespace.render(&" ".repeat(right)));
-        }
-        if i + 1 < lines.len() {
-            out.push('\n');
-        }
-    }
-    out
-}
-
-/// Wraps `text` into lines of at most `width` characters.
-///
-/// The Go lipgloss breaks on spaces and hard-breaks words that are longer than
-/// the line width. The palette only renders single tokens (hexadecimal values
-/// and short labels), so a plain hard break is enough.
-fn wrap_text(text: &str, width: usize) -> Vec<String> {
-    if width == 0 {
-        return vec![String::new()];
-    }
-    if text.chars().count() <= width {
-        return vec![text.to_owned()];
-    }
-    text.chars()
-        .collect::<Vec<char>>()
-        .chunks(width)
-        .map(|chunk| chunk.iter().collect())
-        .collect()
-}
+/// Width of a `#rrggbb` label, in columns.
+const HEX_WIDTH: usize = 7;
+/// Smallest width of the label column in themes.
+const MIN_LABEL_WIDTH: usize = 6;
+/// Largest width of the label column in themes.
+const MAX_LABEL_WIDTH: usize = 24;
+/// Width of the swatch drawn by [`try_show_theme`], in columns.
+const THEME_SWATCH_WIDTH: usize = 12;
+/// Width of each theme column in [`try_compare_themes`], in columns.
+const COMPARE_COLUMN_WIDTH: usize = 16;
 
 /// Renders color swatches with the given total width.
 ///
 /// Each color is drawn as a filled block with its hexadecimal value below it.
-/// The width is divided equally between the swatches, with a minimum of four
-/// columns per swatch.
+/// The width is divided equally between the swatches when there is room for
+/// the `#rrggbb` label of every color; otherwise the swatches are stacked
+/// vertically, one per row, so the requested width is never exceeded.
+///
+/// Invalid input (no colors, zero width) returns an empty string; use
+/// [`try_show_palette`] to get the reason.
 ///
 /// # Examples
 ///
@@ -112,38 +73,76 @@ fn wrap_text(text: &str, width: usize) -> Vec<String> {
 /// assert!(out.contains("#ff0000"));
 /// ```
 pub fn show_palette(colors: &[Rgb], width: usize) -> String {
+    try_show_palette(colors, width).unwrap_or_default()
+}
+
+/// Renders color swatches like [`show_palette`], reporting invalid input.
+///
+/// # Errors
+///
+/// Returns [`Error::NoColors`] when `colors` is empty and
+/// [`Error::InvalidWidth`] when `width` is zero.
+///
+/// # Examples
+///
+/// ```
+/// use charm_core::Rgb;
+/// use charm_palette::{try_show_palette, Error};
+///
+/// assert_eq!(try_show_palette(&[], 10), Err(Error::NoColors));
+/// assert!(try_show_palette(&[Rgb::black()], 10).is_ok());
+/// ```
+pub fn try_show_palette(colors: &[Rgb], width: usize) -> Result<String, Error> {
     if colors.is_empty() {
-        return String::new();
+        return Err(Error::NoColors);
+    }
+    if width == 0 {
+        return Err(Error::InvalidWidth(width));
     }
 
-    let mut swatch_width = width / colors.len();
-    if swatch_width < 4 {
-        swatch_width = 4;
+    let per_swatch = width / colors.len();
+    if per_swatch < HEX_WIDTH {
+        return Ok(render_palette_vertical(colors, width));
     }
+    Ok(render_palette_horizontal(colors, per_swatch))
+}
 
-    let mut top_row = String::new();
-    let mut bottom_row = String::new();
+/// Draws every swatch in one row, with the hexadecimal labels below them.
+fn render_palette_horizontal(colors: &[Rgb], cell: usize) -> String {
+    let mut top = String::new();
+    let mut base = String::new();
 
     for color in colors {
-        let hex = color.to_hex();
+        top.push_str(&swatch(*color, cell));
 
-        let swatch = Style::new()
-            .background(color.to_lipgloss())
-            .width(cells(swatch_width))
-            .render(&" ".repeat(swatch_width));
-
-        let label = render_centered(
-            &hex,
-            swatch_width,
-            &Style::new().foreground(color.to_lipgloss()),
-            &Style::new(),
-        );
-
-        top_row.push_str(&swatch);
-        bottom_row.push_str(&label);
+        let (left, right) = gap(HEX_WIDTH, cell);
+        let label = Style::new()
+            .foreground(contrast(*color).to_lipgloss())
+            .render(&color.to_hex());
+        base.push_str(&" ".repeat(left));
+        base.push_str(&label);
+        base.push_str(&" ".repeat(right));
     }
 
-    format!("{top_row}\n{bottom_row}")
+    format!("{top}\n{base}")
+}
+
+/// Stacks the swatches one per row, for widths too small for the horizontal
+/// layout.
+fn render_palette_vertical(colors: &[Rgb], width: usize) -> String {
+    colors
+        .iter()
+        .map(|color| {
+            let hex = color.to_hex();
+            if width > HEX_WIDTH {
+                let swatch_width = width - HEX_WIDTH - 1;
+                format!("{} {hex}", swatch(*color, swatch_width))
+            } else {
+                truncate(&hex, width)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Displays the 256 ANSI colors in an organized grid.
@@ -165,71 +164,54 @@ pub fn show_ansi256() -> String {
     let mut sb = String::new();
 
     sb.push_str("  Standard Colors (0-15)\n");
-    // Standard colors 0-7.
     for i in 0..8u32 {
-        let style = Style::new().background(Color(i.to_string()));
-        sb.push_str(&render_centered(&format!("{i:>3}"), 4, &style, &style));
+        sb.push_str(&grid_cell(i, None));
     }
     sb.push('\n');
-    // Bright colors 8-15.
     for i in 8..16u32 {
-        let style = Style::new()
-            .background(Color(i.to_string()))
-            .foreground(Color("0".to_string()));
-        sb.push_str(&render_centered(
-            &format!("{i:>3}"),
-            4,
-            &style,
-            &Style::new().background(Color(i.to_string())),
-        ));
+        sb.push_str(&grid_cell(i, Some("0")));
     }
     sb.push_str("\n\n");
 
-    // Color cube 16-231.
     sb.push_str("  Color Cube (16-231)\n");
-    for row in 0..12usize {
-        for col in 0..18usize {
-            let idx = 16 + row * 18 + col;
-            if idx > 231 {
+    for row in 0..12u32 {
+        for col in 0..18u32 {
+            let index = 16 + row * 18 + col;
+            if index > 231 {
                 break;
             }
             let fg = if row > 5 { "0" } else { "15" };
-            let style = Style::new()
-                .background(Color(idx.to_string()))
-                .foreground(Color(fg.to_string()));
-            sb.push_str(&render_centered(
-                &format!("{idx:>3}"),
-                4,
-                &style,
-                &Style::new().background(Color(idx.to_string())),
-            ));
+            sb.push_str(&grid_cell(index, Some(fg)));
         }
         sb.push('\n');
     }
     sb.push('\n');
 
-    // Grayscale ramp 232-255.
     sb.push_str("  Grayscale (232-255)\n");
-    for i in 232..256u32 {
-        let fg = if i > 243 { "0" } else { "15" };
-        let style = Style::new()
-            .background(Color(i.to_string()))
-            .foreground(Color(fg.to_string()));
-        sb.push_str(&render_centered(
-            &format!("{i:>3}"),
-            4,
-            &style,
-            &Style::new().background(Color(i.to_string())),
-        ));
+    for index in 232..256u32 {
+        let fg = if index > 243 { "0" } else { "15" };
+        sb.push_str(&grid_cell(index, Some(fg)));
     }
     sb.push('\n');
 
     sb
 }
 
+/// One four-column cell of the ANSI grid: the index, right-aligned, on its
+/// background color.
+fn grid_cell(index: u32, foreground: Option<&str>) -> String {
+    let mut style = Style::new().background(Color(index.to_string()));
+    if let Some(fg) = foreground {
+        style = style.foreground(Color(fg.to_string()));
+    }
+    style.render(&format!("{index:>3} "))
+}
+
 /// Renders a rainbow gradient using true color.
 ///
-/// The hue varies horizontally and the lightness varies vertically.
+/// The hue varies horizontally and the lightness varies vertically. A zero
+/// width or height returns an empty string; use [`try_show_true_color`] to get
+/// the reason.
 ///
 /// # Examples
 ///
@@ -240,12 +222,32 @@ pub fn show_ansi256() -> String {
 /// assert_eq!(show_true_color(4, 2).lines().count(), 2);
 /// ```
 pub fn show_true_color(width: usize, height: usize) -> String {
+    try_show_true_color(width, height).unwrap_or_default()
+}
+
+/// Renders a rainbow gradient like [`show_true_color`], reporting invalid
+/// dimensions.
+///
+/// # Errors
+///
+/// Returns [`Error::InvalidDimensions`] when `width` or `height` is zero.
+///
+/// # Examples
+///
+/// ```
+/// use charm_palette::{try_show_true_color, Error};
+///
+/// assert_eq!(
+///     try_show_true_color(10, 0),
+///     Err(Error::InvalidDimensions { width: 10, height: 0 })
+/// );
+/// ```
+pub fn try_show_true_color(width: usize, height: usize) -> Result<String, Error> {
     if width == 0 || height == 0 {
-        return String::new();
+        return Err(Error::InvalidDimensions { width, height });
     }
 
     let mut sb = String::new();
-
     for y in 0..height {
         for x in 0..width {
             let hue = x as f64 / width as f64 * 360.0;
@@ -255,19 +257,20 @@ pub fn show_true_color(width: usize, height: usize) -> String {
             let (r, g, b) = hsl_to_rgb(hue, saturation, lightness);
             let hex = format!("#{r:02x}{g:02x}{b:02x}");
 
-            let style = Style::new().background(Color(hex));
-            sb.push_str(&style.render(" "));
+            sb.push_str(&Style::new().background(Color(hex)).render(" "));
         }
         sb.push('\n');
     }
 
-    sb
+    Ok(sb)
 }
 
 /// Renders a named theme with its named colors.
 ///
-/// Each color is displayed as a block, followed by its name and its
-/// hexadecimal value.
+/// Each color is drawn as a swatch, followed by its name and its hexadecimal
+/// value. The colors are sorted alphabetically by name, so the output is
+/// deterministic. An empty theme returns an empty string; use
+/// [`try_show_theme`] to get the reason.
 ///
 /// # Examples
 ///
@@ -284,56 +287,68 @@ pub fn show_true_color(width: usize, height: usize) -> String {
 /// assert!(out.contains("primary"));
 /// ```
 pub fn show_theme(name: &str, colors: &BTreeMap<String, Rgb>) -> String {
+    try_show_theme(name, colors).unwrap_or_default()
+}
+
+/// Renders a named theme like [`show_theme`], reporting invalid input.
+///
+/// # Errors
+///
+/// Returns [`Error::NoColors`] when `colors` is empty.
+///
+/// # Examples
+///
+/// ```
+/// use std::collections::BTreeMap;
+///
+/// use charm_palette::{try_show_theme, Error};
+///
+/// let empty = BTreeMap::new();
+/// assert_eq!(try_show_theme("Empty", &empty), Err(Error::NoColors));
+/// ```
+pub fn try_show_theme(name: &str, colors: &BTreeMap<String, Rgb>) -> Result<String, Error> {
     if colors.is_empty() {
-        return String::new();
+        return Err(Error::NoColors);
     }
 
-    let title_style = Style::new()
+    let label_width = label_column_width(colors.keys().map(String::as_str));
+
+    let title = Style::new()
         .bold(true)
         .foreground(Color("15".to_string()))
-        .padding_2(0, 1);
+        .padding_2(0, 1)
+        .render(&format!("Theme: {name}"));
 
     let mut sb = String::new();
-    sb.push_str(&title_style.render(&format!("Theme: {name}")));
+    sb.push_str(&title);
     sb.push_str("\n\n");
 
     for (label, color) in colors {
-        let hex = color.to_hex();
-
-        let swatch = Style::new()
-            .background(color.to_lipgloss())
-            .width(12)
-            .render(&" ".repeat(12));
-
         let label_styled = Style::new()
-            .foreground(color.to_lipgloss())
-            .width(12)
-            .render(label);
-
+            .foreground(contrast(*color).to_lipgloss())
+            .render(&pad_right(&truncate(label, label_width), label_width));
         let hex_styled = Style::new()
             .foreground(Color("8".to_string()))
-            .width(12)
-            .render(&hex);
+            .render(&color.to_hex());
 
         sb.push_str("  ");
-        sb.push_str(&swatch);
-        sb.push_str("\n  ");
+        sb.push_str(&swatch(*color, THEME_SWATCH_WIDTH));
+        sb.push_str("  ");
         sb.push_str(&label_styled);
-        sb.push_str("\n  ");
+        sb.push_str("  ");
         sb.push_str(&hex_styled);
-        sb.push_str("\n\n");
+        sb.push('\n');
     }
 
-    sb
+    Ok(sb)
 }
 
 /// Renders several themes side by side for comparison.
 ///
-/// Each theme is rendered as a column with its colors stacked. Colors that
-/// are missing from a theme are replaced by a dashed placeholder.
-///
-/// The theme names are accepted for API symmetry, but — like the Go original
-/// — the columns are titled by their position (`Theme 1`, `Theme 2`, ...).
+/// Each theme becomes a column titled `Theme 1`, `Theme 2`, and so on, and
+/// each color name becomes a row. Colors missing from a theme are shown as a
+/// dashed placeholder. Names are sorted alphabetically. Without themes, an
+/// empty string is returned; use [`try_compare_themes`] to get the reason.
 ///
 /// # Examples
 ///
@@ -348,71 +363,161 @@ pub fn show_theme(name: &str, colors: &BTreeMap<String, Rgb>) -> String {
 /// let mut b = BTreeMap::new();
 /// b.insert("primary".to_string(), Rgb::rgb(0x00, 0xff, 0x00));
 ///
-/// let out = compare_themes(&[("A", &a), ("B", &b)]);
+/// let out = compare_themes(&[&a, &b]);
 /// assert!(out.contains("Theme 1"));
 /// assert!(out.contains("Theme 2"));
 /// ```
-pub fn compare_themes(themes: &[(&str, &BTreeMap<String, Rgb>)]) -> String {
+pub fn compare_themes(themes: &[&BTreeMap<String, Rgb>]) -> String {
+    try_compare_themes(themes).unwrap_or_default()
+}
+
+/// Renders several themes side by side like [`compare_themes`], reporting
+/// invalid input.
+///
+/// # Errors
+///
+/// Returns [`Error::NoThemes`] when `themes` is empty.
+///
+/// # Examples
+///
+/// ```
+/// use charm_palette::{try_compare_themes, Error};
+///
+/// assert_eq!(try_compare_themes(&[]), Err(Error::NoThemes));
+/// ```
+pub fn try_compare_themes(themes: &[&BTreeMap<String, Rgb>]) -> Result<String, Error> {
     if themes.is_empty() {
-        return String::new();
+        return Err(Error::NoThemes);
     }
 
-    let col_width = 16usize;
+    let keys: BTreeSet<&str> = themes
+        .iter()
+        .flat_map(|theme| theme.keys().map(String::as_str))
+        .collect();
+    let label_width = label_column_width(keys.iter().copied());
+
     let mut sb = String::new();
 
-    // Collect every unique key.
-    let mut all_keys: BTreeMap<&str, bool> = BTreeMap::new();
-    for (_, theme) in themes {
-        for key in theme.keys() {
-            all_keys.insert(key.as_str(), true);
-        }
-    }
-
-    // Header with the theme index.
-    for (i, _) in themes.iter().enumerate() {
-        let header = render_centered(
-            &format!("Theme {}", i + 1),
-            col_width,
-            &Style::new().bold(true),
-            &Style::new(),
-        );
-        sb.push_str(&header);
+    sb.push_str(&" ".repeat(label_width + 2));
+    for index in 0..themes.len() {
+        let header = center(&format!("Theme {}", index + 1), COMPARE_COLUMN_WIDTH);
+        sb.push_str(&Style::new().bold(true).render(&header));
         sb.push_str("  ");
     }
     sb.push('\n');
 
-    // One row per key, with the swatch of each theme.
-    for key in all_keys.keys() {
-        sb.push_str(
-            &Style::new()
-                .foreground(Color("8".to_string()))
-                .render(&format!("{key:<12}")),
-        );
-        sb.push('\n');
-
-        for (_, theme) in themes {
-            match theme.get(*key) {
-                None => {
-                    sb.push_str(
-                        &Style::new()
-                            .width(cells(col_width))
-                            .render(&"-".repeat(col_width)),
-                    );
-                }
-                Some(color) => {
-                    let swatch = Style::new()
-                        .background(color.to_lipgloss())
-                        .width(cells(col_width))
-                        .render(&" ".repeat(col_width));
-                    sb.push_str(&swatch);
-                }
+    for key in keys {
+        sb.push_str(&label_cell(key, label_width));
+        for theme in themes {
+            match theme.get(key) {
+                None => sb.push_str(&"-".repeat(COMPARE_COLUMN_WIDTH)),
+                Some(color) => sb.push_str(&swatch(*color, COMPARE_COLUMN_WIDTH)),
             }
             sb.push_str("  ");
         }
         sb.push('\n');
     }
 
-    sb
+    Ok(sb)
+}
+
+/// The label column of a comparison row, dimmed and padded to `width`.
+fn label_cell(text: &str, width: usize) -> String {
+    let padded = pad_right(&truncate(text, width), width);
+    format!(
+        "{}  ",
+        Style::new()
+            .foreground(Color("8".to_string()))
+            .render(&padded)
+    )
+}
+
+/// A filled block of `width` columns in the given color.
+fn swatch(color: Rgb, width: usize) -> String {
+    Style::new()
+        .background(color.to_lipgloss())
+        .render(&" ".repeat(width))
+}
+
+/// The foreground color with the best contrast over `color`: black or white,
+/// chosen by the WCAG relative luminance.
+fn contrast(color: Rgb) -> Rgb {
+    if relative_luminance(color) > 0.179 {
+        Rgb::black()
+    } else {
+        Rgb::white()
+    }
+}
+
+/// The WCAG relative luminance of a color.
+fn relative_luminance(color: Rgb) -> f64 {
+    0.2126 * linearize(color.r) + 0.7152 * linearize(color.g) + 0.0722 * linearize(color.b)
+}
+
+/// Linearizes an 8-bit channel, as specified by WCAG.
+fn linearize(channel: u8) -> f64 {
+    let c = f64::from(channel) / 255.0;
+    if c <= 0.03928 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+/// Width of the label column: the widest label, clamped to the theme limits.
+fn label_column_width<'a>(labels: impl Iterator<Item = &'a str>) -> usize {
+    let widest = labels.map(charm_core::display_width).max().unwrap_or(0);
+    widest.clamp(MIN_LABEL_WIDTH, MAX_LABEL_WIDTH)
+}
+
+/// Splits the free columns around `content` into a left and a right gap, with
+/// the extra column (if any) on the right.
+fn gap(content: usize, width: usize) -> (usize, usize) {
+    let free = width.saturating_sub(content);
+    let left = free / 2;
+    (left, free - left)
+}
+
+/// Centers `text` in `width` columns.
+fn center(text: &str, width: usize) -> String {
+    let (left, right) = gap(charm_core::display_width(text), width);
+    format!("{}{text}{}", " ".repeat(left), " ".repeat(right))
+}
+
+/// Pads `text` with spaces on the right until it spans `width` columns.
+fn pad_right(text: &str, width: usize) -> String {
+    let current = charm_core::display_width(text);
+    format!("{text}{}", " ".repeat(width.saturating_sub(current)))
+}
+
+/// Keeps at most `max` columns of `text`, ending it with `…` when it is cut.
+fn truncate(text: &str, max: usize) -> String {
+    if max == 0 {
+        return String::new();
+    }
+    if charm_core::display_width(text) <= max {
+        return text.to_owned();
+    }
+    if max == 1 {
+        return "…".to_owned();
+    }
+    format!("{}…", take_columns(text, max - 1))
+}
+
+/// The longest prefix of `text` that fits in `columns` columns.
+fn take_columns(text: &str, columns: usize) -> String {
+    let mut out = String::new();
+    let mut used = 0;
+    for ch in text.chars() {
+        let mut buf = [0u8; 4];
+        let step = charm_core::display_width(ch.encode_utf8(&mut buf));
+        if used + step > columns {
+            break;
+        }
+        used += step;
+        out.push(ch);
+    }
+    out
 }
 
 /// Converts HSL values to RGB.
@@ -451,29 +556,67 @@ fn hsl_to_rgb(h: f64, s: f64, l: f64) -> (u8, u8, u8) {
 mod tests {
     use super::*;
 
-    #[test]
-    fn empty_palette_renders_nothing() {
-        assert_eq!(show_palette(&[], 40), "");
+    fn plain(text: &str) -> String {
+        charm_core::strip_ansi(text)
     }
 
     #[test]
-    fn palette_has_two_rows() {
+    fn empty_palette_is_an_error() {
+        assert_eq!(show_palette(&[], 40), "");
+        assert_eq!(try_show_palette(&[], 40), Err(Error::NoColors));
+    }
+
+    #[test]
+    fn zero_width_is_an_error() {
+        assert_eq!(
+            try_show_palette(&[Rgb::black()], 0),
+            Err(Error::InvalidWidth(0))
+        );
+        assert_eq!(show_palette(&[Rgb::black()], 0), "");
+    }
+
+    #[test]
+    fn horizontal_palette_has_two_rows_and_fills_the_width() {
         let out = show_palette(&[Rgb::rgb(0xff, 0, 0), Rgb::rgb(0, 0xff, 0)], 40);
-        assert_eq!(out.lines().count(), 2);
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 2);
+        for line in lines {
+            assert_eq!(charm_core::display_width(line), 40);
+        }
     }
 
     #[test]
     fn palette_shows_the_hexadecimal_value() {
-        let out = show_palette(&[Rgb::rgb(0xff, 0, 0)], 40);
+        let out = plain(&show_palette(&[Rgb::rgb(0xff, 0, 0)], 40));
         assert!(out.contains("#ff0000"));
     }
 
     #[test]
-    fn palette_minimum_swatch_width_is_four() {
-        let out = show_palette(&[Rgb::rgb(0xff, 0, 0)], 1);
-        let first = charm_core::strip_ansi(&out);
-        let first = first.lines().next().unwrap_or_default();
-        assert_eq!(first.chars().count(), 4);
+    fn narrow_palette_stacks_the_colors_and_respects_the_width() {
+        let out = plain(&show_palette(
+            &[Rgb::rgb(0x28, 0x28, 0x28), Rgb::rgb(0xfa, 0xbd, 0x2f)],
+            8,
+        ));
+        assert_eq!(out, " #282828\n #fabd2f");
+    }
+
+    #[test]
+    fn very_narrow_palette_truncates_the_label() {
+        let out = plain(&show_palette(&[Rgb::rgb(0x28, 0x28, 0x28)], 5));
+        assert_eq!(out, "#282…");
+    }
+
+    #[test]
+    fn contrast_is_black_on_light_and_white_on_dark() {
+        assert_eq!(contrast(Rgb::rgb(240, 230, 140)), Rgb::black());
+        assert_eq!(contrast(Rgb::rgb(15, 23, 42)), Rgb::white());
+    }
+
+    #[test]
+    fn palette_label_uses_the_contrast_color() {
+        let out = show_palette(&[Rgb::rgb(15, 23, 42)], 20);
+        assert!(!out.contains("\x1b[38;2;15;23;42m"));
+        assert!(out.contains("\x1b[38;2;255;255;255m"));
     }
 
     #[test]
@@ -493,9 +636,34 @@ mod tests {
     }
 
     #[test]
-    fn true_color_with_zero_size_renders_nothing() {
+    fn ansi256_grid_has_the_expected_shape() {
+        let out = plain(&show_ansi256());
+        let lines: Vec<&str> = out.lines().collect();
+        let cube = lines
+            .iter()
+            .position(|l| l.contains("Color Cube"))
+            .unwrap_or_default();
+        let gray = lines
+            .iter()
+            .position(|l| l.contains("Grayscale"))
+            .unwrap_or_default();
+        let rows = &lines[cube + 1..gray - 1];
+        assert_eq!(rows.len(), 12);
+        for row in rows {
+            assert_eq!(charm_core::display_width(row), 18 * 4);
+        }
+    }
+
+    #[test]
+    fn true_color_with_zero_size_is_an_error() {
         assert_eq!(show_true_color(0, 10), "");
-        assert_eq!(show_true_color(10, 0), "");
+        assert_eq!(
+            try_show_true_color(10, 0),
+            Err(Error::InvalidDimensions {
+                width: 10,
+                height: 0
+            })
+        );
     }
 
     #[test]
@@ -504,24 +672,56 @@ mod tests {
     }
 
     #[test]
-    fn empty_theme_renders_nothing() {
+    fn empty_theme_is_an_error() {
         let colors = BTreeMap::new();
         assert_eq!(show_theme("empty", &colors), "");
+        assert_eq!(try_show_theme("empty", &colors), Err(Error::NoColors));
     }
 
     #[test]
     fn theme_shows_the_title_and_the_labels() {
         let mut colors = BTreeMap::new();
         colors.insert("primary".to_string(), Rgb::rgb(0xff, 0x79, 0xc6));
-        let out = show_theme("Dracula", &colors);
+        let out = plain(&show_theme("Dracula", &colors));
         assert!(out.contains("Theme: Dracula"));
         assert!(out.contains("primary"));
         assert!(out.contains("#ff79c6"));
     }
 
     #[test]
-    fn empty_theme_list_renders_nothing() {
+    fn theme_rows_are_sorted_alphabetically() {
+        let mut colors = BTreeMap::new();
+        colors.insert("text".to_string(), Rgb::white());
+        colors.insert("background".to_string(), Rgb::black());
+        colors.insert("primary".to_string(), Rgb::rgb(1, 2, 3));
+        let out = plain(&show_theme("Order", &colors));
+        let background = out.find("background").unwrap_or_default();
+        let primary = out.find("primary").unwrap_or_default();
+        let text = out.find("text").unwrap_or_default();
+        assert!(background < primary && primary < text);
+    }
+
+    #[test]
+    fn long_theme_labels_are_truncated_inside_their_column() {
+        let mut colors = BTreeMap::new();
+        colors.insert(
+            "nome-de-etapa-muito-comprido".to_string(),
+            Rgb::rgb(1, 2, 3),
+        );
+        colors.insert("configuração".to_string(), Rgb::rgb(4, 5, 6));
+        let out = plain(&show_theme("Longos", &colors));
+        assert!(out.contains('…'));
+        // Indent, swatch, gap, label column and hex value.
+        let row_width = 2 + THEME_SWATCH_WIDTH + 2 + 24 + 2 + HEX_WIDTH;
+        for line in out.lines().filter(|line| line.contains('#')) {
+            assert!(charm_core::display_width(line) <= row_width, "{line:?}");
+        }
+    }
+
+    #[test]
+    fn empty_theme_list_is_an_error() {
         assert_eq!(compare_themes(&[]), "");
+        assert_eq!(try_compare_themes(&[]), Err(Error::NoThemes));
     }
 
     #[test]
@@ -530,7 +730,7 @@ mod tests {
         a.insert("primary".to_string(), Rgb::rgb(0xff, 0, 0));
         let mut b = BTreeMap::new();
         b.insert("primary".to_string(), Rgb::rgb(0, 0xff, 0));
-        let out = charm_core::strip_ansi(&compare_themes(&[("A", &a), ("B", &b)]));
+        let out = plain(&compare_themes(&[&a, &b]));
         assert!(out.contains("Theme 1"));
         assert!(out.contains("Theme 2"));
         assert!(out.contains("primary"));
@@ -541,8 +741,24 @@ mod tests {
         let mut a = BTreeMap::new();
         a.insert("primary".to_string(), Rgb::rgb(0xff, 0, 0));
         let b = BTreeMap::new();
-        let out = charm_core::strip_ansi(&compare_themes(&[("A", &a), ("B", &b)]));
+        let out = plain(&compare_themes(&[&a, &b]));
         assert!(out.contains("----------------"));
+    }
+
+    #[test]
+    fn compare_themes_rows_have_the_same_width_as_the_header() {
+        let mut a = BTreeMap::new();
+        a.insert("background".to_string(), Rgb::rgb(15, 23, 42));
+        a.insert("primary".to_string(), Rgb::rgb(99, 102, 241));
+        let mut b = BTreeMap::new();
+        b.insert("background".to_string(), Rgb::black());
+        b.insert("primary".to_string(), Rgb::rgb(220, 38, 38));
+        let out = plain(&compare_themes(&[&a, &b]));
+        let lines: Vec<&str> = out.lines().collect();
+        let expected = charm_core::display_width(lines[0]);
+        for line in &lines {
+            assert_eq!(charm_core::display_width(line), expected, "{line:?}");
+        }
     }
 
     #[test]
@@ -555,24 +771,128 @@ mod tests {
     }
 
     #[test]
-    fn wrap_text_hard_breaks_long_words() {
-        assert_eq!(wrap_text("#282828", 4), vec!["#282", "828"]);
-        assert_eq!(wrap_text("#282828", 5), vec!["#2828", "28"]);
-        assert_eq!(wrap_text("#282828", 8), vec!["#282828"]);
-        assert_eq!(wrap_text("#282828", 0), vec![""]);
+    fn truncate_keeps_whole_characters() {
+        assert_eq!(truncate("abcdef", 4), "abc…");
+        assert_eq!(truncate("abc", 4), "abc");
+        assert_eq!(truncate("abc", 1), "…");
+        assert_eq!(truncate("日本語", 4), "日…");
     }
 
     #[test]
-    fn render_centered_gives_the_extra_cell_to_the_right() {
-        // The Go lipgloss uses `left = gap / 2`; the Rust port rounds up.
-        let out = charm_core::strip_ansi(&render_centered("abc", 4, &Style::new(), &Style::new()));
-        assert_eq!(out, "abc ");
+    fn gap_gives_the_extra_column_to_the_right() {
+        assert_eq!(gap(3, 4), (0, 1));
+        assert_eq!(gap(3, 6), (1, 2));
+    }
+
+    fn six_colors() -> Vec<Rgb> {
+        vec![
+            Rgb::rgb(255, 89, 94),
+            Rgb::rgb(255, 202, 58),
+            Rgb::rgb(138, 201, 38),
+            Rgb::rgb(25, 130, 196),
+            Rgb::rgb(106, 76, 147),
+            Rgb::rgb(1, 2, 3),
+        ]
     }
 
     #[test]
-    fn render_centered_wraps_long_labels() {
-        let out =
-            charm_core::strip_ansi(&render_centered("#282828", 4, &Style::new(), &Style::new()));
-        assert_eq!(out, "#282\n828 ");
+    fn small_palette_never_exceeds_the_requested_width() {
+        let out = plain(&show_palette(&six_colors(), 20));
+        assert_ne!(out, "");
+        for line in out.lines() {
+            assert!(charm_core::display_width(line) <= 20, "{line:?}");
+        }
+        for color in six_colors() {
+            assert!(out.contains(&color.to_hex()), "missing {}", color.to_hex());
+        }
+    }
+
+    #[test]
+    fn horizontal_palette_fills_the_requested_width_exactly() {
+        let out = show_palette(&six_colors()[..5], 80);
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 2);
+        for line in lines {
+            assert_eq!(charm_core::display_width(line), 80, "{line:?}");
+        }
+    }
+
+    #[test]
+    fn translucent_colors_keep_their_channels() {
+        let out = plain(&show_palette(&[Rgb::new(255, 0, 0, 128)], 20));
+        assert!(out.contains("#ff0000"));
+    }
+
+    #[test]
+    fn theme_labels_use_the_contrast_color() {
+        let mut colors = BTreeMap::new();
+        colors.insert("dark".to_string(), Rgb::rgb(15, 23, 42));
+        colors.insert("light".to_string(), Rgb::rgb(240, 230, 140));
+        let out = show_theme("Contraste", &colors);
+        assert!(!out.contains("\x1b[38;2;15;23;42m"));
+        assert!(out.contains("\x1b[38;2;255;255;255m"));
+        assert!(!out.contains("\x1b[38;2;240;230;140m"));
+        assert!(out.contains("\x1b[38;2;0;0;0m"));
+    }
+
+    #[test]
+    fn true_color_rows_have_the_requested_width() {
+        let out = show_true_color(4, 2);
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 2);
+        for line in lines {
+            assert_eq!(charm_core::display_width(line), 4);
+        }
+    }
+
+    #[test]
+    fn compare_themes_header_sits_over_the_swatch_column() {
+        let mut a = BTreeMap::new();
+        a.insert("background".to_string(), Rgb::rgb(15, 23, 42));
+        a.insert("primary".to_string(), Rgb::rgb(99, 102, 241));
+        let mut b = BTreeMap::new();
+        b.insert("background".to_string(), Rgb::black());
+        b.insert("primary".to_string(), Rgb::rgb(220, 38, 38));
+        let out = plain(&compare_themes(&[&a, &b]));
+        let header = out.lines().next().unwrap_or_default();
+        let column = header.find("Theme 1").unwrap_or_default();
+        let start = charm_core::display_width(&header[..column]);
+        let swatch_start = label_column_width(["background", "primary"].into_iter()) + 2;
+        assert!(start >= swatch_start);
+        assert!(start + "Theme 1".len() <= swatch_start + COMPARE_COLUMN_WIDTH);
+    }
+
+    #[test]
+    fn compare_themes_long_labels_keep_the_rows_aligned() {
+        let mut colors = BTreeMap::new();
+        colors.insert("configuração".to_string(), Rgb::rgb(99, 102, 241));
+        colors.insert(
+            "nome-de-etapa-muito-comprido".to_string(),
+            Rgb::rgb(168, 85, 247),
+        );
+        let out = plain(&compare_themes(&[&colors]));
+        let lines: Vec<&str> = out.lines().collect();
+        let expected = charm_core::display_width(lines[0]);
+        for line in lines {
+            assert_eq!(charm_core::display_width(line), expected, "{line:?}");
+        }
+    }
+
+    #[test]
+    fn hsl_to_rgb_covers_every_sector() {
+        let cases = [
+            (0.0, 255, 0, 0),
+            (60.0, 255, 255, 0),
+            (120.0, 0, 255, 0),
+            (180.0, 0, 255, 255),
+            (240.0, 0, 0, 255),
+            (300.0, 255, 0, 255),
+            (360.0, 255, 0, 0),
+        ];
+        for (h, r, g, b) in cases {
+            assert_eq!(hsl_to_rgb(h, 1.0, 0.5), (r, g, b), "hue {h}");
+        }
+        let (r, g, b) = hsl_to_rgb(123.0, 0.0, 0.5);
+        assert!(r == g && g == b && (127..=128).contains(&r));
     }
 }

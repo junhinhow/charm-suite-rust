@@ -2,7 +2,7 @@
 
 use lipgloss::{Color, Style};
 
-/// Default width of the sidebar container.
+/// Default width of the sidebar, in columns.
 pub const DEFAULT_WIDTH: usize = 20;
 
 /// Default cursor drawn in front of the selected item.
@@ -22,7 +22,12 @@ pub const MUTED_COLOR: &str = "#666666";
 /// The selected item is rendered with [`selected_style`](Sidebar::selected_style)
 /// and prefixed by the [`cursor`](Sidebar::cursor). The other items are
 /// rendered with [`unselected_style`](Sidebar::unselected_style) and prefixed
-/// by as many spaces as the cursor has bytes, so the labels stay aligned.
+/// by as many spaces as the cursor occupies in columns, so the labels stay
+/// aligned.
+///
+/// Every line is exactly [`width`](Sidebar::width) columns wide. Items that do
+/// not fit are truncated, never wrapped, and the highlight covers the whole
+/// line.
 ///
 /// # Examples
 ///
@@ -37,7 +42,7 @@ pub const MUTED_COLOR: &str = "#666666";
 /// ```
 #[derive(Debug, Clone)]
 pub struct Sidebar {
-    /// Width of the sidebar container.
+    /// Width of the sidebar, in columns. Zero is rendered as one column.
     pub width: usize,
     /// Prefix drawn in front of the selected item.
     pub cursor: String,
@@ -54,7 +59,7 @@ pub struct Sidebar {
 impl Sidebar {
     /// Creates a new sidebar with the given labels.
     ///
-    /// The first item is selected. The default width is 20 characters, the
+    /// The first item is selected. The default width is 20 columns, the
     /// default cursor is `"\u{25B8} "`, the selected style is bold on a dark
     /// background and the unselected style is dimmed.
     ///
@@ -157,6 +162,9 @@ impl Sidebar {
 
     /// Returns the labels of the menu items.
     ///
+    /// The slice is borrowed from the menu, so it cannot change its state. The
+    /// Go original returns a copy for the same guarantee.
+    ///
     /// # Examples
     ///
     /// ```
@@ -170,9 +178,69 @@ impl Sidebar {
         &self.items
     }
 
+    /// Appends items to the end of the menu.
+    ///
+    /// Returns the index of the first item added, or `None` when `items` is
+    /// empty (the Go original returns `-1`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_nav::Sidebar;
+    ///
+    /// let mut sidebar = Sidebar::new(&["a", "b"]);
+    /// assert_eq!(sidebar.add(&["c"]), Some(2));
+    /// assert_eq!(sidebar.items().len(), 3);
+    /// ```
+    pub fn add(&mut self, items: &[&str]) -> Option<usize> {
+        if items.is_empty() {
+            return None;
+        }
+        let first = self.items.len();
+        self.items
+            .extend(items.iter().map(|item| (*item).to_string()));
+        Some(first)
+    }
+
+    /// Removes the item at `index` and returns its label.
+    ///
+    /// Returns an empty string when `index` is out of range, as in Go. The
+    /// selection follows the removal: removing an item before the selected one
+    /// keeps the same item selected, and removing the selected item selects the
+    /// next one (or the last one, when it was the final item).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_nav::Sidebar;
+    ///
+    /// let mut sidebar = Sidebar::new(&["a", "b", "c"]);
+    /// sidebar.set_selected(2);
+    /// assert_eq!(sidebar.remove(0), "a");
+    /// assert_eq!(sidebar.items()[sidebar.selected()], "c");
+    /// assert_eq!(sidebar.remove(9), "");
+    /// ```
+    pub fn remove(&mut self, index: usize) -> String {
+        if index >= self.items.len() {
+            return String::new();
+        }
+        let removed = self.items.remove(index);
+
+        if index < self.selected {
+            self.selected -= 1;
+        } else if self.selected >= self.items.len() && !self.items.is_empty() {
+            self.selected = self.items.len() - 1;
+        }
+
+        removed
+    }
+
     /// Renders the styled sidebar.
     ///
-    /// An empty sidebar renders as an empty string.
+    /// Each item occupies one line of exactly [`width`](Sidebar::width)
+    /// columns. The cursor is measured in display columns, not bytes, and the
+    /// labels are truncated to fit. An empty sidebar renders as an empty
+    /// string.
     ///
     /// # Examples
     ///
@@ -189,113 +257,43 @@ impl Sidebar {
             return String::new();
         }
 
-        let container_style = Style::new()
-            .width(to_i32(self.width))
-            .padding_left(1)
-            .padding_right(1);
+        // One column of padding on each side of the content.
+        let width = self.width.max(1);
+        let avail = width.saturating_sub(2);
 
-        // The Go original pads the unselected items with `len(Cursor)` spaces,
-        // that is, with the number of *bytes* of the cursor.
-        let padding = " ".repeat(self.cursor.len());
+        // The cursor takes the same number of columns on every item, even when
+        // it is multibyte (for example "▸ " is 4 bytes and 2 columns).
+        let cursor_width = lipgloss::utils::width_visible(&self.cursor).min(avail);
+        let text_width = avail - cursor_width;
+
+        let selected_prefix = Style::truncate_visible_line(&self.cursor, cursor_width);
+        let unselected_prefix = " ".repeat(cursor_width);
 
         let lines: Vec<String> = self
             .items
             .iter()
             .enumerate()
             .map(|(index, item)| {
-                if index == self.selected {
-                    self.selected_style
-                        .render(&format!("{}{}", self.cursor, item))
+                let (prefix, style) = if index == self.selected {
+                    (&selected_prefix, &self.selected_style)
                 } else {
-                    self.unselected_style.render(&format!("{padding}{item}"))
+                    (&unselected_prefix, &self.unselected_style)
+                };
+
+                let text = Style::truncate_visible_line(item, text_width);
+
+                // The left padding is part of the styled text, so the highlight
+                // of the selected item covers the whole line.
+                let mut line = format!(" {prefix}{text}");
+                let used = lipgloss::utils::width_visible(&line);
+                if used < width {
+                    line.push_str(&" ".repeat(width - used));
                 }
+
+                style.render(&line)
             })
             .collect();
 
-        container_style.render(&lines.join("\n"))
-    }
-}
-
-/// Converts an `usize` dimension into the `i32` expected by `lipgloss`.
-///
-/// Values above `i32::MAX` are clamped instead of overflowing.
-fn to_i32(value: usize) -> i32 {
-    i32::try_from(value).unwrap_or(i32::MAX)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use lipgloss::utils::strip_ansi;
-
-    #[test]
-    fn new_uses_the_go_defaults() {
-        let sidebar = Sidebar::new(&["a"]);
-        assert_eq!(sidebar.width, 20);
-        assert_eq!(sidebar.cursor, "\u{25B8} ");
-        assert_eq!(sidebar.selected(), 0);
-    }
-
-    #[test]
-    fn empty_sidebar_renders_empty_string() {
-        assert_eq!(Sidebar::new(&[]).render(), "");
-    }
-
-    #[test]
-    fn set_selected_ignores_out_of_range_indexes() {
-        let mut sidebar = Sidebar::new(&["a", "b"]);
-        sidebar.set_selected(9);
-        assert_eq!(sidebar.selected(), 0);
-        sidebar.set_selected(1);
-        assert_eq!(sidebar.selected(), 1);
-    }
-
-    #[test]
-    fn next_wraps_around() {
-        let mut sidebar = Sidebar::new(&["a", "b"]);
-        sidebar.next();
-        sidebar.next();
-        assert_eq!(sidebar.selected(), 0);
-    }
-
-    #[test]
-    fn previous_wraps_around() {
-        let mut sidebar = Sidebar::new(&["a", "b"]);
-        sidebar.previous();
-        assert_eq!(sidebar.selected(), 1);
-    }
-
-    #[test]
-    fn next_and_previous_on_empty_sidebar_do_nothing() {
-        let mut sidebar = Sidebar::new(&[]);
-        sidebar.next();
-        sidebar.previous();
-        assert_eq!(sidebar.selected(), 0);
-    }
-
-    #[test]
-    fn render_marks_the_selected_item_with_the_cursor() {
-        let mut sidebar = Sidebar::new(&["Dashboard", "Users"]);
-        sidebar.set_selected(1);
-        let rendered = strip_ansi(&sidebar.render());
-        let lines: Vec<&str> = rendered.lines().collect();
-        assert!(lines[0].contains("  Dashboard"));
-        assert!(lines[1].contains("\u{25B8} Users"));
-    }
-
-    #[test]
-    fn unselected_items_are_padded_with_the_cursor_width() {
-        let sidebar = Sidebar::new(&["Dashboard", "Users"]);
-        let rendered = strip_ansi(&sidebar.render());
-        let lines: Vec<&str> = rendered.lines().collect();
-        // The cursor occupies 4 bytes, so the unselected item is shifted by 4
-        // columns, keeping the labels aligned.
-        assert!(lines[1].contains("    Users"));
-    }
-
-    #[test]
-    fn items_returns_the_labels() {
-        let sidebar = Sidebar::new(&["a", "b"]);
-        assert_eq!(sidebar.items(), ["a".to_string(), "b".to_string()]);
+        lines.join("\n")
     }
 }

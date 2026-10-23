@@ -2,7 +2,7 @@
 
 > [Leia em ingles](README.md)
 
-Uma colecao de 30 animacoes de spinner para terminal em Rust, estilizadas com
+Uma colecao de 42 animacoes de spinner para terminal em Rust, estilizadas com
 [lipgloss](https://crates.io/crates/lipgloss).
 
 Esta crate e um port Rust da biblioteca Go
@@ -38,23 +38,30 @@ fn main() -> io::Result<()> {
 }
 ```
 
-Uma versao executavel esta em `examples/demo.rs`:
+Uma versao executavel esta em `examples/charm_spinner_demo.rs`:
 
 ```bash
-cargo run -p charm-spinner --example demo -- Dots
-cargo run -p charm-spinner --example demo -- list
+cargo run -p charm-spinner --example charm_spinner_demo -- Dots
+cargo run -p charm-spinner --example charm_spinner_demo -- list
 ```
+
+`render` percorre os frames automaticamente: qualquer indice e valido, e um
+spinner sem frames devolve uma string vazia em vez de entrar em panico.
 
 ## API
 
 | Item | Descricao |
 |------|-----------|
-| `Spinner { frames, interval }` | Uma animacao: os frames ordenados e o intervalo entre eles |
-| `Spinner::new(frames, interval)` | Cria um spinner |
+| `Spinner { frames, interval, style }` | Uma animacao: os frames ordenados, o intervalo entre eles e um estilo opcional |
+| `Spinner::new(frames, interval)` | Cria um spinner sem estilo proprio |
+| `Spinner::with_style(style)` | Define o estilo proprio do spinner |
 | `Spinner::render(frame)` | Renderiza o frame da posicao `frame`, ciclando com wrap-around |
-| `dots()`, `line()`, `star()`, ... | Os 30 spinners predefinidos |
+| `dots()`, `line()`, `star()`, ... | Os 42 spinners predefinidos |
 | `all()` | Todos os spinners predefinidos, indexados pelo nome (`"Dots"`, `"Line"`, ...) |
-| `default_style()` / `DEFAULT_STYLE` | O estilo global do lipgloss aplicado aos frames |
+| `names()` | Os nomes dos spinners predefinidos, em ordem alfabetica |
+| `default_style()` | Uma copia do estilo padrao do pacote |
+| `set_default_style(style)` | Troca o estilo padrao do pacote, com seguranca mesmo com outras threads renderizando |
+| `DEFAULT_STYLE` | O estilo padrao embutido (vazio), valor inicial do estilo padrao do pacote |
 
 ## Spinners disponiveis
 
@@ -90,14 +97,28 @@ cargo run -p charm-spinner --example demo -- list
 | Orbit | `◜  ◝  ◞  ◟ ` |
 | Rocket | `🚀 💨 ✨ 🌟 ✨ 💨` |
 | Fire | `🔥 🔥 💥 ✨ 🔥 💥` |
+| Ellipsis | `. .. ...` |
+| Rectangle | `▛ ▜ ▙ ▟` |
+| Diamond | `◆ ◇` |
+| Hexagon | `⬢ ⬡` |
+| BouncingBar | `[    ] [=   ] [==  ] [=== ] [ ===] [  ==] [   =]` |
+| Digits | `0 1 2 3 4 5 6 7 8 9` |
+| Quotes | `' " ❞ ❟` |
+| Cat | `😺 😸 😹 😻 😼 😽` |
+| Money | `💰 💵 💴 💶` |
+| Beach | `🏖️ 🌴 🌊 ☀️` |
+| Music | `♪ ♫ ♬` |
+| Target | `◎ ◉ ⊙ ◉` |
 
-Todos os spinners ficam disponiveis de uma vez atraves de `all()`:
+Todos os spinners ficam disponiveis de uma vez atraves de `all()`, e `names()`
+lista os nomes em ordem alfabetica:
 
 ```rust
-use charm_spinner::all;
+use charm_spinner::{all, names};
 
 let spinners = all();
-assert_eq!(spinners.len(), 30);
+assert_eq!(spinners.len(), 42);
+assert_eq!(names().len(), 42);
 
 for (name, spinner) in spinners {
     println!("{name}: {} frames a cada {} ms", spinner.frames.len(), spinner.interval.as_millis());
@@ -120,17 +141,30 @@ assert_eq!(custom.render(0), "🐱");
 assert_eq!(custom.render(3), "🐱"); // faz wrap-around
 ```
 
-## Estilo
+## Estilos
 
-`Spinner::render` aplica o `DEFAULT_STYLE`, o equivalente ao `var Style =
-lipgloss.NewStyle()` de nivel de pacote no Go. Assim como no Go, o estilo padrao
-e vazio, portanto os frames sao renderizados sem alteracoes.
+Cada spinner pode carregar o proprio estilo do lipgloss. Quando nao carrega,
+vale o estilo padrao do pacote:
 
 ```rust
-use charm_spinner::default_style;
+use std::time::Duration;
 
-let style = default_style();
-assert_eq!(style.render("x"), "x");
+use charm_spinner::{Spinner, Style};
+
+let custom = Spinner::new(vec!["🐱".to_owned()], Duration::from_millis(200))
+    .with_style(Style::new().bold(true));
+```
+
+O estilo padrao do pacote pode ser trocado a qualquer momento, inclusive
+enquanto outras threads renderizam, com `set_default_style`:
+
+```rust
+use charm_spinner::{default_style, set_default_style, Style};
+
+let anterior = default_style();
+set_default_style(Style::new().bold(true));
+// ... renderiza spinners ...
+set_default_style(anterior);
 ```
 
 ## Paridade com o original em Go
@@ -147,7 +181,7 @@ de encoding (mojibake). O compilador reproduz exatamente os mesmos bytes UTF-8
 do fonte Go.
 
 Os testes de paridade comparam a saida Rust com os golden files gerados pelo
-programa Go — byte a byte, nos 30 spinners e nos 204 frames:
+programa Go, byte a byte, nos 42 spinners e nos 257 frames:
 
 ```bash
 cargo run -p charm-parity --bin parity -- gen \
@@ -173,8 +207,11 @@ rustc --edition 2021 crates/charm-spinner/scripts/generate_spinners.rs -o genera
 | Go | Rust |
 |----|------|
 | `spinner.Dots` (variavel de pacote) | `charm_spinner::dots()` (funcao) |
-| `spinner.All()` retorna `map[string]Spinner` | `charm_spinner::all()` retorna `BTreeMap<&'static str, Spinner>` (ordenado) |
-| `spinner.Style` (variavel global mutavel) | `charm_spinner::DEFAULT_STYLE` / `default_style()` |
+| `spinner.All()` / `spinner.Clone()` retornam mapas | `charm_spinner::all()` retorna um `BTreeMap<&'static str, Spinner>` novo (ordenado) a cada chamada |
+| `spinner.Names()` | `charm_spinner::names()` retorna `Vec<&'static str>` (ordenado) |
+| `spinner.Style` (variavel de pacote) | `charm_spinner::DEFAULT_STYLE` e o valor inicial; o atual e `default_style()` / `set_default_style()` |
+| `Spinner{Frames, Interval, Style}` | `Spinner { frames, interval, style: Option<Style> }`: um literal de struct precisa de `style: None`, e `with_style` e a forma de builder |
+| `Render(frame int)` aceita indices negativos | `render(frame: usize)` nao tem indices negativos; use `frames.len() - n` para contar a partir do fim |
 | `Render` entra em panico quando o spinner nao tem frames | `render` retorna uma string vazia |
 
 ## Licenca

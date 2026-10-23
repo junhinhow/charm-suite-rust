@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Synchronised with the Go `charm-table-cli` command, whose `main.go` was split
+into `input.go`, `parse.go` and `render.go`.
+
+### Added
+
+- JSON and JSON Lines: the columns are the union of the keys of every record.
+  Inside each record the keys are sorted, so the order is the same on every run.
+- `--no-header` applies to JSON and JSON Lines too: the columns become `Col1`,
+  `Col2`, and so on.
+- CSV and TSV: records with different numbers of fields are padded to the
+  widest record, instead of aborting with `wrong number of fields`.
+- CSV and TSV: a single line of text is a header with no rows.
+- Delimiter detection ignores separators inside quoted fields, so a tab inside
+  a quoted field does not turn CSV into TSV.
+- A leading byte order mark (BOM) is ignored.
+- JSON Lines: a line over 16 MiB is an error, and a decoding error names the
+  line number.
+- `--max-width` that cannot hold the borders and padding is an error that
+  states the minimum width.
+- Cell line breaks and tabs are shown as spaces, so they cannot break the
+  table.
+- Tests ported from the Go suite (`main_test.go`): column union, JSONL line
+  numbers and long lines, ragged rows, `--no-header`, stdin, encoding and
+  limits, `--max-width`, truncation, delimiter detection and the column joints.
+- `reference/go/charm-table-cli/cmd/parity`, the Go program that generates the
+  golden file. It builds the real binary and runs the same matrix as the Rust
+  integration tests. The matrix gained four cases: `csv_irregular`,
+  `json_union_keys`, `csv_quoted_tab` and `csv_cjk`.
+
+### Changed
+
+- `--style ascii` draws plain ASCII characters (`+`, `-`, `|`), not single
+  Unicode lines.
+- `--max-width` is exact: the table fits the limit whenever that is possible.
+  The old per-column rule that could leave a table wider than the limit is gone.
+- Column widths and truncation count terminal cells (`unicode-width`), not
+  characters. CJK and emoji stay aligned.
+- Numbers are shown in the shortest decimal form, without an exponent:
+  `1e-7` is `0.0000001` and `1e21` is `1000000000000000000000`. This replaces
+  the `%g` formatting of 0.1.0.
+- Leading spaces in delimited values are kept. The reader no longer trims them.
+- Error messages are printed as `Erro: <message>` with the Go wording, for
+  example `Erro: entrada vazia: nenhum dado para renderizar`.
+- The output ends with an empty line, as the Go output does.
+- The golden file was regenerated from the new Go reference. The `csv_max_width`
+  case uses width 20: width 12 is too small for four columns, and the Go
+  program reports it as an error.
+
 ### Fixed
 
 - Table cells no longer wrap onto extra lines, and the table stays aligned.

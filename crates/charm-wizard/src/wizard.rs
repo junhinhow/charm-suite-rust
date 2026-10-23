@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 
 use serde_json::Value;
 
@@ -32,7 +32,21 @@ impl fmt::Debug for Step {
     }
 }
 
+/// Outcome of the last execution of a step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StepStatus {
+    /// Not executed yet, or undone by [`Wizard::back`].
+    Pending,
+    /// Executed successfully.
+    Completed,
+    /// Returned an error. The wizard refuses to move past it.
+    Failed,
+}
+
 /// A multi-step wizard with shared state and forward/backward navigation.
+///
+/// Going back undoes the data changes of the step being left: the data map
+/// is restored to the state it had before that step ran.
 ///
 /// # Examples
 ///
@@ -60,9 +74,12 @@ impl fmt::Debug for Step {
 /// ```
 pub struct Wizard {
     steps: Vec<Step>,
+    statuses: Vec<StepStatus>,
     current_step: usize,
     data: DataMap,
     title: String,
+    /// Copy of the data taken right before each step ran, used by `back`.
+    before_state: HashMap<usize, DataMap>,
 }
 
 impl Default for Wizard {
@@ -78,7 +95,7 @@ impl fmt::Debug for Wizard {
             .field("current_step", &self.current_step)
             .field("data", &self.data)
             .field("title", &self.title)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -97,9 +114,11 @@ impl Wizard {
     pub fn new() -> Self {
         Self {
             steps: Vec::new(),
+            statuses: Vec::new(),
             current_step: 0,
             data: DataMap::new(),
             title: "Wizard".to_owned(),
+            before_state: HashMap::new(),
         }
     }
 
@@ -122,6 +141,9 @@ impl Wizard {
     /// Appends a step. The closure receives the shared data and may fail with
     /// an [`Error`] to stop the wizard.
     ///
+    /// Use a closure that does nothing, such as `|_| Ok(())`, for a step
+    /// without work. The Go API accepts a nil function for this.
+    ///
     /// # Examples
     ///
     /// ```
@@ -142,6 +164,7 @@ impl Wizard {
             description: description.to_owned(),
             run_func: Box::new(f),
         });
+        self.statuses.push(StepStatus::Pending);
         self
     }
 
@@ -167,6 +190,60 @@ impl Wizard {
         self
     }
 
+    /// Returns the value of `key` when it is a string.
+    ///
+    /// Returns `None` when the key is missing or holds another type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_wizard::Wizard;
+    /// use serde_json::json;
+    ///
+    /// let wizard = Wizard::new().set_data("name", json!("ana"));
+    /// assert_eq!(wizard.get_string("name"), Some("ana"));
+    /// assert_eq!(wizard.get_string("missing"), None);
+    /// ```
+    pub fn get_string(&self, key: &str) -> Option<&str> {
+        self.data.get(key)?.as_str()
+    }
+
+    /// Returns the value of `key` when it is a boolean.
+    ///
+    /// Returns `None` when the key is missing or holds another type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_wizard::Wizard;
+    /// use serde_json::json;
+    ///
+    /// let wizard = Wizard::new().set_data("active", json!(true));
+    /// assert_eq!(wizard.get_bool("active"), Some(true));
+    /// ```
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
+        self.data.get(key)?.as_bool()
+    }
+
+    /// Returns the value of `key` when it is an integer.
+    ///
+    /// Returns `None` when the key is missing, holds another type, or holds a
+    /// number with a fractional part. The Go API uses `int`; the Rust port
+    /// returns `i64`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_wizard::Wizard;
+    /// use serde_json::json;
+    ///
+    /// let wizard = Wizard::new().set_data("count", json!(3));
+    /// assert_eq!(wizard.get_int("count"), Some(3));
+    /// ```
+    pub fn get_int(&self, key: &str) -> Option<i64> {
+        self.data.get(key)?.as_i64()
+    }
+
     /// Returns the index of the current step (zero-based).
     pub fn current_step(&self) -> usize {
         self.current_step
@@ -182,7 +259,79 @@ impl Wizard {
         &self.steps
     }
 
-    /// Moves to the previous step.
+    /// Returns the name of the current step, or `""` when there are no steps.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_wizard::{DataMap, Wizard};
+    ///
+    /// let wizard = Wizard::new().add_step("config", "Setup", |_: &mut DataMap| Ok(()));
+    /// assert_eq!(wizard.current_step_name(), "config");
+    /// ```
+    pub fn current_step_name(&self) -> &str {
+        self.steps
+            .get(self.current_step)
+            .map_or("", |step| step.name.as_str())
+    }
+
+    /// Returns `true` when the current step is the first one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_wizard::Wizard;
+    ///
+    /// assert!(Wizard::new().is_first());
+    /// ```
+    pub fn is_first(&self) -> bool {
+        self.current_step == 0
+    }
+
+    /// Returns `true` when the current step is the last one, or when there are
+    /// no steps.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_wizard::Wizard;
+    ///
+    /// assert!(Wizard::new().is_last());
+    /// ```
+    pub fn is_last(&self) -> bool {
+        self.steps.is_empty() || self.current_step + 1 >= self.steps.len()
+    }
+
+    /// Returns the fraction of steps completed successfully, from `0.0` to `1.0`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use charm_wizard::{DataMap, Wizard};
+    ///
+    /// let mut wizard = Wizard::new()
+    ///     .add_step("a", "A", |_: &mut DataMap| Ok(()))
+    ///     .add_step("b", "B", |_: &mut DataMap| Ok(()));
+    /// wizard.run_step_to(&mut Vec::<u8>::new())?;
+    /// assert_eq!(wizard.progress(), 0.5);
+    /// # Ok::<(), charm_wizard::Error>(())
+    /// ```
+    pub fn progress(&self) -> f64 {
+        if self.steps.is_empty() {
+            return 0.0;
+        }
+        let completed = self
+            .statuses
+            .iter()
+            .filter(|status| **status == StepStatus::Completed)
+            .count();
+        let completed = u32::try_from(completed).unwrap_or(u32::MAX);
+        let total = u32::try_from(self.steps.len()).unwrap_or(u32::MAX);
+        f64::from(completed) / f64::from(total)
+    }
+
+    /// Moves to the previous step and undoes the data changes of the step
+    /// being left.
     ///
     /// Returns `false` and does not move when already on the first step.
     ///
@@ -198,13 +347,20 @@ impl Wizard {
         if self.current_step == 0 {
             return false;
         }
+        if let Some(snapshot) = self.before_state.get(&self.current_step) {
+            self.data = snapshot.clone();
+            if let Some(status) = self.statuses.get_mut(self.current_step) {
+                *status = StepStatus::Pending;
+            }
+        }
         self.current_step -= 1;
         true
     }
 
     /// Moves to the next step.
     ///
-    /// Returns `false` and does not move when already on the last step.
+    /// Returns `false` and does not move when already on the last step, or
+    /// when the current step failed: a broken step cannot be skipped.
     ///
     /// # Examples
     ///
@@ -218,7 +374,10 @@ impl Wizard {
     /// assert!(!wizard.forward());
     /// ```
     pub fn forward(&mut self) -> bool {
-        if self.current_step + 1 >= self.steps.len() {
+        if self.is_last() {
+            return false;
+        }
+        if self.statuses.get(self.current_step) == Some(&StepStatus::Failed) {
             return false;
         }
         self.current_step += 1;
@@ -249,20 +408,26 @@ impl Wizard {
         Ok(())
     }
 
-    /// Runs every step in order from the first one, printing the title,
-    /// progress and completion message to standard output.
+    /// Runs the steps in order, starting at the current step, and prints the
+    /// title, the progress and the completion message to standard output.
     ///
-    /// Stops at the first failing step and returns its error.
+    /// Stops at the first failing step and returns its error. When standard
+    /// output is a terminal, each progress block is redrawn in place.
     ///
     /// # Errors
     ///
     /// Returns [`Error::NoSteps`] when the wizard is empty, [`Error::StepFailed`]
     /// when a step fails, and [`Error::Io`] when writing output fails.
     pub fn run(&mut self) -> Result<(), Error> {
-        self.run_to(&mut std::io::stdout())
+        let mut out = std::io::stdout();
+        let in_place = out.is_terminal();
+        self.run_with(&mut out, in_place)
     }
 
     /// Like [`Wizard::run`], but writes the output to `out`.
+    ///
+    /// The output is never redrawn in place, because `out` may not be a
+    /// terminal.
     ///
     /// # Errors
     ///
@@ -276,32 +441,18 @@ impl Wizard {
     /// let mut wizard = Wizard::new().add_step("a", "A", |_: &mut DataMap| Ok(()));
     /// let mut out = Vec::<u8>::new();
     /// wizard.run_to(&mut out)?;
-    /// assert!(String::from_utf8_lossy(&out).contains("completed successfully"));
+    /// assert!(String::from_utf8_lossy(&out).contains("concluído com sucesso"));
     /// # Ok::<(), charm_wizard::Error>(())
     /// ```
     pub fn run_to<W: Write>(&mut self, out: &mut W) -> Result<(), Error> {
-        if self.steps.is_empty() {
-            return Err(Error::NoSteps);
-        }
-
-        writeln!(out, "{}", render_title(&self.title))?;
-        writeln!(out)?;
-
-        for index in 0..self.steps.len() {
-            self.current_step = index;
-            writeln!(out, "{}", render_progress(&self.steps, index))?;
-            writeln!(out)?;
-            self.execute(index)?;
-            writeln!(out)?;
-        }
-
-        writeln!(out, "{}", render_complete(&self.title))?;
-        Ok(())
+        self.run_with(out, false)
     }
 
-    /// Runs only the current step, without advancing.
+    /// Runs only the current step, without advancing, and prints its progress.
     ///
-    /// Useful for interactive wizards that drive navigation themselves.
+    /// The progress block is printed even when the step fails, so the user
+    /// can see where the wizard stopped. Standard output is used, as in
+    /// [`Wizard::run`].
     ///
     /// # Errors
     ///
@@ -318,27 +469,103 @@ impl Wizard {
     ///     d.insert("ran".into(), json!(true));
     ///     Ok(())
     /// });
-    /// wizard.run_step()?;
-    /// assert_eq!(wizard.data()["ran"], true);
+    /// wizard.run_step_to(&mut Vec::<u8>::new())?;
+    /// assert_eq!(wizard.get_bool("ran"), Some(true));
     /// # Ok::<(), charm_wizard::Error>(())
     /// ```
     pub fn run_step(&mut self) -> Result<(), Error> {
+        self.run_step_to(&mut std::io::stdout())
+    }
+
+    /// Like [`Wizard::run_step`], but writes the progress to `out`.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Wizard::run_step`].
+    pub fn run_step_to<W: Write>(&mut self, out: &mut W) -> Result<(), Error> {
         if self.steps.is_empty() {
             return Err(Error::NoSteps);
         }
         let index = self.current_step;
-        self.execute(index)
+        let outcome = self.execute(index);
+        writeln!(out, "{}", render_progress(&self.steps, index))?;
+        outcome
+    }
+
+    fn run_with<W: Write>(&mut self, out: &mut W, in_place: bool) -> Result<(), Error> {
+        if self.steps.is_empty() {
+            return Err(Error::NoSteps);
+        }
+
+        write!(out, "{}\n\n", render_title(&self.title))?;
+
+        let mut lines = 0;
+        for index in self.current_step..self.steps.len() {
+            self.current_step = index;
+
+            if in_place && lines > 0 {
+                write!(out, "{}", erase_sequence(lines))?;
+            }
+
+            // The progress block is printed even when the step fails, so the
+            // user knows which step stopped the run.
+            let outcome = self.execute(index);
+            let block = render_progress(&self.steps, index);
+            writeln!(out, "{block}")?;
+            lines = count_lines(&block);
+
+            outcome?;
+        }
+
+        if in_place && lines > 0 {
+            write!(out, "{}", erase_sequence(lines))?;
+        }
+        writeln!(out, "{}", render_complete(&self.title))?;
+        Ok(())
     }
 
     fn execute(&mut self, index: usize) -> Result<(), Error> {
         let total = self.steps.len();
-        let step = self
-            .steps
-            .get_mut(index)
-            .ok_or(Error::InvalidIndex { index, total })?;
-        (step.run_func)(&mut self.data).map_err(|source| Error::StepFailed {
+        if index >= total {
+            return Err(Error::InvalidIndex { index, total });
+        }
+
+        self.before_state.insert(index, self.data.clone());
+
+        let step = &mut self.steps[index];
+        let outcome = (step.run_func)(&mut self.data);
+        let status = if outcome.is_ok() {
+            StepStatus::Completed
+        } else {
+            StepStatus::Failed
+        };
+        if let Some(slot) = self.statuses.get_mut(index) {
+            *slot = status;
+        }
+
+        outcome.map_err(|source| Error::StepFailed {
             name: step.name.clone(),
             source: Box::new(source),
         })
+    }
+}
+
+/// Escape sequence that erases the last `lines` lines written to a terminal.
+///
+/// Returns an empty string when `lines` is zero.
+pub(crate) fn erase_sequence(lines: usize) -> String {
+    if lines == 0 {
+        String::new()
+    } else {
+        format!("\x1b[{lines}A\x1b[J")
+    }
+}
+
+/// Counts the lines of a block of text. An empty text has no lines.
+pub(crate) fn count_lines(text: &str) -> usize {
+    if text.is_empty() {
+        0
+    } else {
+        text.matches('\n').count() + 1
     }
 }

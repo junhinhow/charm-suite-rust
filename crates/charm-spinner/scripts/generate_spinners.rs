@@ -1,7 +1,7 @@
 //! Gerador de `src/spinners.rs` a partir da implementacao Go de referencia.
 //!
 //! Este script le `reference/go/charm-spinner/spinner.go` (UTF-8), extrai os
-//! `Frames` e o `Interval` de cada um dos 30 spinners e emite o codigo Rust
+//! `Frames` e o `Interval` de cada um dos 42 spinners e emite o codigo Rust
 //! equivalente.
 //!
 //! Os frames **nunca** sao digitados a mao: o script faz o parsing dos
@@ -28,6 +28,9 @@ const MAX_WIDTH: usize = 100;
 /// Largura maxima de uma lista antes do layout vertical, igual ao
 /// `array_width` padrao do `rustfmt` (60% de `max_width`).
 const ARRAY_WIDTH: usize = 60;
+
+/// Quantidade de spinners predefinidos no fonte Go.
+const EXPECTED_SPINNERS: usize = 42;
 
 /// Dados de um spinner extraidos do fonte Go.
 struct SpinnerData {
@@ -77,7 +80,7 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Extrai os 30 spinners do fonte Go.
+/// Extrai os 42 spinners do fonte Go.
 fn parse(source: &str) -> Result<Vec<SpinnerData>, String> {
     let mut spinners: Vec<SpinnerData> = Vec::new();
     let mut current: Option<SpinnerData> = None;
@@ -142,9 +145,9 @@ fn parse(source: &str) -> Result<Vec<SpinnerData>, String> {
     if current.is_some() {
         return Err("bloco de spinner nao fechado ao fim do arquivo".to_owned());
     }
-    if spinners.len() != 30 {
+    if spinners.len() != EXPECTED_SPINNERS {
         return Err(format!(
-            "esperados 30 spinners, encontrados {}",
+            "esperados {EXPECTED_SPINNERS} spinners, encontrados {}",
             spinners.len()
         ));
     }
@@ -261,7 +264,7 @@ fn read_radix(
     Ok((value, count))
 }
 
-/// Emite o arquivo Rust com os 30 spinners.
+/// Emite o arquivo Rust com os 42 spinners.
 fn generate(spinners: &[SpinnerData]) -> String {
     let mut out = String::new();
 
@@ -347,7 +350,7 @@ fn generate(spinners: &[SpinnerData]) -> String {
     out.push_str("///\n");
     out.push_str("/// ```\n");
     out.push_str("/// let spinners = charm_spinner::all();\n");
-    out.push_str("/// assert_eq!(spinners.len(), 30);\n");
+    out.push_str("/// assert_eq!(spinners.len(), 42);\n");
     out.push_str("/// assert!(spinners.contains_key(\"Dots\"));\n");
     out.push_str("/// ```\n");
     out.push_str("pub fn all() -> BTreeMap<&'static str, Spinner> {\n");

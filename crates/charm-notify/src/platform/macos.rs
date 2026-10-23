@@ -116,6 +116,22 @@ mod tests {
     }
 
     #[test]
+    fn ignores_icon_because_notification_center_has_no_custom_icons() {
+        let mut notification = sample("Hi", "There");
+        notification.icon = "/icons/app.png".to_owned();
+        let command = build_command(&notification);
+        assert!(!args_of(&command)[1].contains("app.png"));
+    }
+
+    #[test]
+    fn ignores_timeout_because_osascript_has_no_expiry_option() {
+        let mut notification = sample("Hi", "There");
+        notification.timeout = Duration::from_secs(9);
+        let command = build_command(&notification);
+        assert!(!args_of(&command)[1].contains('9'));
+    }
+
+    #[test]
     fn has_no_sound_by_default() {
         let command = build_command(&sample("Hi", "There"));
         assert!(!args_of(&command)[1].contains("sound name"));

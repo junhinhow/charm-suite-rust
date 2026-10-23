@@ -31,7 +31,7 @@ fn main() {
     manager.add_success("Arquivo salvo", Duration::from_secs(3));
     manager.add(Toast::new("Falha de rede", Duration::from_secs(5)).with_type(ToastType::Error));
 
-    // Shows up to `max_visible` active toasts, one below the other.
+    // Shows up to `max_visible` active toasts, the newest first.
     println!("{}", manager.render(60));
 
     // Drops the expired toasts. Call this from your event loop.
@@ -45,6 +45,26 @@ A runnable version lives in `examples/charm_toast_demo.rs`:
 cargo run -p charm-toast --example charm_toast_demo
 ```
 
+## Event loop integration
+
+The Go `ToastManager.Tick()` returns a Bubble Tea command. This crate has no
+runtime dependency, so the same information is exposed as plain values, and
+your application schedules the timer with the runtime it uses:
+
+```rust,ignore
+// After every update, re-arm the timer if a toast will expire.
+if let Some(delay) = manager.tick_delay() {
+    schedule_after(delay); // your runtime: send `ExpiredMsg` back when it fires
+}
+
+// When the timer fires, build the message and clean up.
+let msg = manager.expired_msg(); // charm_toast::ExpiredMsg { ids }
+manager.cleanup();
+```
+
+`tick_delay` includes the same one-millisecond grace period as Go, so the toast
+is already expired when the message arrives.
+
 ## Types
 
 | Type | Label | Icon | Color |
@@ -54,25 +74,59 @@ cargo run -p charm-toast --example charm_toast_demo
 | `ToastType::Warning` | `warning` | `!` | `#e5c07b` |
 | `ToastType::Error` | `error` | `x` | `#e06c75` |
 
+## Behaviour
+
+- **Expiry**: a toast expires once its `duration` has elapsed since `created_at`.
+  A zero `duration` makes the toast *persistent*: it never expires on its own
+  and must be removed with `remove` or `clear`.
+- **`created_at` is preserved**: `ToastManager::add` keeps the instant set by the
+  caller, so an already expired toast is not revived by being added.
+- **Display order**: the most recent toast is rendered at the top, older ones
+  below. `max_visible` keeps the most recent toasts. `0` means no limit.
+- **Width**: `render(width)` treats `width` as an upper bound. The message is
+  truncated, the icon is dropped when there is no room for it, and the box is
+  right-aligned. A width of `0` means no limit.
+- **Identifiers**: every toast has an `id` (`toast-1`, `toast-2`, ...), used by
+  `remove`, `update` and `ExpiredMsg`.
+
 ## API
+
+### Toast
 
 | Item | Description |
 |------|-------------|
-| `ToastType` | `Info`, `Success`, `Warning`, `Error`. `label()`, `icon()`, `color()` (a `charm_core::Rgb`) |
-| `Toast { message, duration, r#type, created_at }` | A notification. All fields are public |
-| `Toast::new(message, duration)` | Creates an `Info` toast created now |
-| `Toast::with_type`, `with_message`, `with_duration`, `with_created_at` | Builders that consume and return the toast |
-| `Toast::is_expired()` / `remaining()` | Expiry, using the current time |
-| `Toast::is_expired_at(now)` / `remaining_at(now)` | Expiry at a given `Instant` |
-| `Toast::render(width)` | The box, right-aligned in `width` columns (`0` = no alignment) |
-| `ToastManager { max_visible }` | Manager. `max_visible` defaults to `5` |
-| `ToastManager::new()` | Creates an empty manager |
-| `add`, `add_info`, `add_success`, `add_warning`, `add_error` | Adds a toast. `add` sets `created_at` to now, as in Go |
-| `cleanup()` / `count()` / `clear()` / `render(width)` | Same as the Go methods, using the current time |
-| `add_at`, `cleanup_at`, `count_at`, `render_at` | The same operations with an explicit `Instant` |
+| `Toast { id, message, duration, r#type, created_at }` | A notification. All fields are public |
+| `Toast::new(message, duration)` | Creates an `Info` toast created now, with a new `id` |
+| `with_type`, `with_message`, `with_duration`, `with_id`, `with_created_at` | Builders that consume and return the toast |
+| `persistent()` | `true` when the toast never expires on its own |
+| `is_expired()` / `remaining()` | Expiry and time left, using the current time |
+| `is_expired_at(now)` / `remaining_at(now)` | The same, at a given `Instant` |
+| `expires_at()` | `Option<Instant>`: `None` for persistent toasts |
+| `render(width)` | The box, right-aligned in `width` columns (`0` = no limit) |
 
-`render` shows the most recent active toasts, in insertion order, up to
-`max_visible`. It returns `""` when no toast is active.
+### ToastManager
+
+| Item | Description |
+|------|-------------|
+| `ToastManager::new()` | Creates an empty manager with `max_visible` of `5` |
+| `max_visible()` / `set_max_visible(n)` | Limit of rendered toasts. `0` removes the limit |
+| `add(toast)` | Adds a toast, keeping its `created_at` and generating an `id` if it is empty |
+| `add_info`, `add_success`, `add_warning`, `add_error` | Adds a toast of that type |
+| `toasts()` | Copies of the active toasts, newest first. Removes the expired ones first |
+| `remove(id)` | Removes a toast. Returns `true` when it existed |
+| `update(id, f)` | Replaces a toast with `f(copy)`. Returns `true` when it existed |
+| `cleanup()` / `count()` / `clear()` | Remove expired toasts, count active ones, remove all |
+| `render(width)` | The visible toasts, stacked, or `""` when there are none |
+| `next_expiry()` | Time left until the next toast expires (`ZERO` when none) |
+| `tick_delay()` | Delay to arm the timer with, or `None` when nothing expires |
+| `expired_ids()` / `expired_msg()` | The expired identifiers, or the `ExpiredMsg` to deliver |
+
+Every method that depends on time also has an `_at` variant that takes an
+`Instant`: `cleanup_at`, `count_at`, `render_at`, `toasts_at`, `next_expiry_at`,
+`tick_delay_at`, `expired_ids_at`, `expired_msg_at`, `add_at`.
+
+`render` shows the active toasts, newest first, up to `max_visible`. It returns
+`""` when no toast is active.
 
 ## Testing expiry without sleeping
 
@@ -97,9 +151,10 @@ assert_eq!(manager.count_at(later), 1);
 
 The golden file `tests/golden/toast.txt` is generated by the Go program in
 `reference/go/charm-toast/cmd/parity`. It covers the type strings, icons and
-colors, each type rendered at widths 0 and 40, and a manager with several
-toasts, with `MaxVisible` at its default and at `2`. The comparison removes
-ANSI codes and trailing spaces on both sides.
+colors, each type rendered at widths 0 and 40, truncation at widths 2, 5, 12
+and 24, persistent toasts, and a manager with `max_visible` at its default and
+at `2`, including `toasts`, `update` and `remove`. The comparison removes ANSI
+codes and trailing spaces on both sides.
 
 ```bash
 cargo run -p charm-parity --bin parity -- gen \
@@ -114,9 +169,16 @@ cargo test -p charm-toast
 | Go | Rust |
 |----|------|
 | `sync.Mutex` inside `ToastManager` | Synchronous API with `&mut self`. There is no lock |
+| `Tick() tea.Cmd` and `ExpiredMsg` | `tick_delay()`, `expired_msg()` and a plain `ExpiredMsg { ids }`. Scheduling the timer is up to the caller |
+| `SetMaxVisible` / `MaxVisible` and the mutex around them | `set_max_visible` / `max_visible`, with `&mut self` |
+| `Render` removes expired toasts | `render` takes `&self`, so it hides them without removing them. Call `cleanup` |
+| `ExpiresAt()` returns the zero `time.Time` | `expires_at()` returns `Option<Instant>` |
+| `Duration <= 0` is persistent | `Duration` is unsigned. Zero is persistent; negative values cannot be expressed |
 | `CreatedAt time.Time` | `created_at: Instant` (monotonic, so expiry is not affected by clock changes) |
 | `ToastType.String()` | `ToastType::label()`, plus `Display` |
+| `ToastType.Color()` returns `color.Color` | `color()` returns `charm_core::Rgb` |
 | `NewToastManager()` returns `*ToastManager` | `ToastManager::new()` returns a value |
+| `Toasts()` returns the copies, newest first | `toasts()` returns the same copies, newest first, but takes `&mut self` because it prunes |
 | (none) | `*_at` variants and `with_created_at`. They are extra API, for tests and for callers that control time. The default methods behave as in Go |
 
 ## License

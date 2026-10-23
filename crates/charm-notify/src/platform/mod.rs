@@ -161,6 +161,24 @@ mod tests {
     }
 
     #[test]
+    fn successful_command_is_ok() {
+        #[cfg(windows)]
+        let command = {
+            let mut command = Command::new("cmd");
+            command.args(["/C", "exit 0"]);
+            command
+        };
+        #[cfg(not(windows))]
+        let command = {
+            let mut command = Command::new("sh");
+            command.args(["-c", "exit 0"]);
+            command
+        };
+
+        assert!(run_command(command).is_ok());
+    }
+
+    #[test]
     fn captures_stderr_of_a_failed_command() {
         #[cfg(windows)]
         let command = {

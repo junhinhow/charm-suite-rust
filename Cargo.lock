@@ -175,6 +175,7 @@ version = "0.1.0"
 dependencies = [
  "charm-core",
  "charm-parity",
+ "charmed-bubbletea",
  "lipgloss",
 ]
 
@@ -247,6 +248,7 @@ dependencies = [
  "charm-core",
  "charm-parity",
  "lipgloss",
+ "thiserror",
 ]
 
 [[package]]

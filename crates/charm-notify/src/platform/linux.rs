@@ -90,7 +90,9 @@ mod tests {
     #[test]
     fn omits_expire_time_for_zero_timeout() {
         let command = build_command(&sample("", Duration::ZERO));
-        assert!(!args_of(&command).iter().any(|arg| arg.starts_with("--expire-time")));
+        assert!(!args_of(&command)
+            .iter()
+            .any(|arg| arg.starts_with("--expire-time")));
     }
 
     #[test]

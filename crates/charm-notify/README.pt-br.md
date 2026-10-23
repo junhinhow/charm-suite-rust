@@ -17,7 +17,8 @@ notificação nativa no Windows, macOS e Linux.
 > | macOS | `osascript` | Já vem com o macOS |
 > | Linux | `notify-send` | Instale o `libnotify` (ex.: `apt install libnotify-bin`) |
 >
-> Se o programa não existir, [`send`] retorna `Error::BinaryNotFound`.
+> Se o programa não existir, [`send`] retorna `Error::BinaryNotFound`. No caso
+> do `notify-send`, a mensagem também indica como instalar o `libnotify`.
 
 ## Instalação
 
@@ -147,8 +148,6 @@ não instalado"), para que a causa real nunca se perca.
   do Go estão em português.
 * A forma `Notification::builder()` do roadmap não é usada: a API pública é
   `NotifyOptions`, como as funções `Option` do Go.
-* O erro de binário ausente no Linux não traz a dica de instalação na
-  mensagem; a dica está na tabela acima.
 * O `Send` do Go recebe opções funcionais e ignora as `nil`; o `send` do Rust
   recebe um valor `&NotifyOptions`, então não há caso `nil`.
 * Os sentinelas `ErrCommandNotFound` e `ErrMultilineText` do Go viram as

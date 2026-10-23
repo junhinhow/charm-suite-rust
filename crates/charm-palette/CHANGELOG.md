@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Synchronised with the Go `charm-palette` package after its API and layout
+changes.
+
+### Changed
+
+* **Breaking:** `compare_themes` takes `&[&BTreeMap<String, Rgb>]`. The theme
+  names were dropped, as in the Go `CompareThemes(themes...)`; the columns are
+  titled `Theme 1`, `Theme 2`, and so on.
+* **Breaking:** `compare_themes` layout: one row per color name, with a swatch
+  per theme (before, each name had its own line above its swatches).
+* `show_theme` layout: each color is one line made of the swatch, the name and
+  the hexadecimal value. The name column is 6 to 24 columns wide and long names
+  are shortened with `…` (before, each color took three lines).
+* `show_palette` labels use the automatic contrast color, black or white,
+  chosen by WCAG luminance. Before they used the swatch color, which was hard
+  to read on dark swatches.
+* `show_palette` stacks the swatches one per row when the width cannot fit
+  every `#rrggbb` label, so the requested width is never exceeded.
+
+### Added
+
+* `Error` enum (`NoColors`, `NoThemes`, `InvalidWidth`, `InvalidDimensions`).
+* `try_show_palette`, `try_show_true_color`, `try_show_theme` and
+  `try_compare_themes`, which return `Result<String, Error>`.
+* Unit tests ported from the Go `palette_test.go` suite.
+
 ## [0.1.0] - 2026-10-22
 
 ### Added

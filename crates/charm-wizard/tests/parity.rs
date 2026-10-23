@@ -60,6 +60,13 @@ fn run_captured(wizard: &mut Wizard) -> (Result<(), Error>, String) {
     (result, String::from_utf8_lossy(&buf).into_owned())
 }
 
+/// Returns what was written to `buf` so far, and clears it.
+fn take(buf: &mut Vec<u8>) -> String {
+    let text = String::from_utf8_lossy(buf).into_owned();
+    buf.clear();
+    text
+}
+
 #[test]
 #[allow(clippy::too_many_lines)]
 fn wizard_parity() {
@@ -95,7 +102,7 @@ fn wizard_parity() {
     let steps = w.steps();
     for i in 0..=steps.len() {
         if i >= steps.len() {
-            // Go panics on an out-of-range index; the Rust port returns "".
+            // Go returns "" here too; the golden keeps the marker line only.
             writeln!(out, "progress[{i}]: out of range").expect("write");
             continue;
         }
@@ -114,7 +121,12 @@ fn wizard_parity() {
     let mut empty = Wizard::new();
     let (empty_run, _) = run_captured(&mut empty);
     writeln!(out, "empty_run_err={}", empty_run.is_err()).expect("write");
-    writeln!(out, "empty_runstep_err={}", empty.run_step().is_err()).expect("write");
+    writeln!(
+        out,
+        "empty_runstep_err={}",
+        empty.run_step_to(&mut Vec::new()).is_err()
+    )
+    .expect("write");
     writeln!(out, "empty_render={:?}", render_progress(&[], 0)).expect("write");
 
     out.push_str("### RUN_STEP\n");
@@ -127,9 +139,14 @@ fn wizard_parity() {
             d.insert("two".into(), json!(2));
             Ok(())
         });
-    writeln!(out, "runstep_first_err={}", rs.run_step().is_err()).expect("write");
+    let mut buf: Vec<u8> = Vec::new();
+    let first = rs.run_step_to(&mut buf);
+    out.push_str(&take(&mut buf));
+    writeln!(out, "runstep_first_err={}", first.is_err()).expect("write");
     rs.forward();
-    writeln!(out, "runstep_second_err={}", rs.run_step().is_err()).expect("write");
+    let second = rs.run_step_to(&mut buf);
+    out.push_str(&take(&mut buf));
+    writeln!(out, "runstep_second_err={}", second.is_err()).expect("write");
     print_data(&mut out, rs.data());
 
     out.push_str("### FAILURE\n");

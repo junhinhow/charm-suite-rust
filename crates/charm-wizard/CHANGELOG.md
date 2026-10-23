@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Synchronized with the Go `charm-wizard` after its state, undo and progress
+changes.
+
+### Added
+
+- `Wizard::run_step_to` and `Wizard::progress`, `is_first`, `is_last` and
+  `current_step_name`.
+- Typed getters `get_string`, `get_bool` and `get_int`, which return `None`
+  for a missing key or a value of another type.
+
+### Changed
+
+- `run` starts at the current step, so `go_to` followed by `run` skips the
+  earlier steps. Before, it always started at step 0.
+- `run` prints each progress block after its step runs, including the block
+  of a failed step, and then stops.
+- `run_step` prints the progress of the step, as the Go `RunStep` does.
+- `back` restores the shared data to the state it had before the step being
+  left ran.
+- `forward` refuses to move past a step that failed.
+- `run` redraws each progress block in place when standard output is a
+  terminal. `run_to` never does.
+- Progress texts match Go: `Etapa N de M: <description>` and
+  `✓ <title> concluído com sucesso!`. Before, they were in English.
+- The parity golden file is regenerated from the new Go program.
+
 ## [0.1.0] - 2026-10-22
 
 ### Added

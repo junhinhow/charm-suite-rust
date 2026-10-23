@@ -62,8 +62,8 @@ fn step_info_style() -> Style {
 ///
 /// The output has three lines: the description of the current step, one dot
 /// per step, and the progress bar with its percentage. Returns an empty string
-/// when `steps` is empty or `current` is out of range; the Go implementation
-/// panics in the latter case.
+/// when `steps` is empty or `current` is out of range, as the Go
+/// implementation does.
 ///
 /// # Examples
 ///
@@ -84,7 +84,7 @@ fn step_info_style() -> Style {
 /// ];
 ///
 /// let text = render_progress(&steps, 0);
-/// assert!(text.contains("Step 1 of 2: Configuration"));
+/// assert!(text.contains("Etapa 1 de 2: Configuration"));
 /// assert!(text.contains("50%"));
 /// ```
 pub fn render_progress(steps: &[Step], current: usize) -> String {
@@ -92,7 +92,7 @@ pub fn render_progress(steps: &[Step], current: usize) -> String {
         return String::new();
     };
     let info = step_info_style().render(&format!(
-        "Step {} of {}: {}",
+        "Etapa {} de {}: {}",
         current + 1,
         steps.len(),
         step.description
@@ -123,14 +123,16 @@ fn render_dots(steps: &[Step], current: usize) -> String {
 }
 
 /// Renders the progress bar followed by the completed percentage.
+///
+/// The index is clamped to the last step, so the bar never reports more than
+/// 100%. A zero `total` renders an empty bar without a percentage.
 fn render_bar(total: usize, current: usize) -> String {
-    let (filled, percent) = match total {
-        0 => (0, 0),
-        _ => (
-            (((current + 1) * BAR_WIDTH) / total).min(BAR_WIDTH),
-            ((current + 1) * 100) / total,
-        ),
-    };
+    if total == 0 {
+        return bar_empty_style().render(&"░".repeat(BAR_WIDTH));
+    }
+    let index = current.min(total - 1);
+    let filled = (((index + 1) * BAR_WIDTH) / total).min(BAR_WIDTH);
+    let percent = (((index + 1) * 100) / total).min(100);
     let full = bar_filled_style().render(&"█".repeat(filled));
     let empty = bar_empty_style().render(&"░".repeat(BAR_WIDTH - filled));
     format!("{full}{empty} {percent}%")
@@ -143,12 +145,12 @@ pub(crate) fn render_title(title: &str) -> String {
 
 /// Renders the success message shown at the end of a run.
 pub(crate) fn render_complete(title: &str) -> String {
-    complete_style().render(&format!("✓ {title} completed successfully!"))
+    complete_style().render(&format!("✓ {title} concluído com sucesso!"))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{render_bar, render_dots, render_progress};
+    use super::{render_bar, render_complete, render_dots, render_progress};
     use crate::Step;
 
     fn steps(names: &[(&str, &str)]) -> Vec<Step> {
@@ -186,13 +188,51 @@ mod tests {
     }
 
     #[test]
+    fn bar_percentage_never_exceeds_one_hundred() {
+        for current in 0..=20 {
+            let text = plain(&render_bar(4, current));
+            let percent: usize = text
+                .rsplit(' ')
+                .next()
+                .and_then(|p| p.trim_end_matches('%').parse().ok())
+                .expect("percentage at the end of the bar");
+            assert!(percent <= 100, "current={current}: {text:?}");
+        }
+        assert!(plain(&render_bar(2, 5)).ends_with("100%"));
+    }
+
+    #[test]
+    fn bar_has_thirty_cells_plus_label_width() {
+        assert_eq!(
+            lipgloss::utils::width_visible(&render_bar(4, 1)),
+            30 + 1 + 3
+        );
+    }
+
+    #[test]
+    fn bar_for_zero_total_is_empty_without_percentage() {
+        let text = plain(&render_bar(0, 0));
+        assert_eq!(text, "░".repeat(30));
+    }
+
+    #[test]
     fn progress_has_info_dots_and_bar_lines() {
         let s = steps(&[("config", "Configuration"), ("deploy", "Deploy")]);
         let lines: Vec<String> = render_progress(&s, 1).lines().map(plain).collect();
         assert_eq!(lines.len(), 3);
-        assert_eq!(lines[0], "Step 2 of 2: Deploy");
+        assert_eq!(lines[0], "Etapa 2 de 2: Deploy");
         assert_eq!(lines[1], "[*] config --- [>] deploy");
         assert!(lines[2].ends_with(" 100%"));
+    }
+
+    #[test]
+    fn progress_reports_the_current_step_and_completion_message() {
+        let s = steps(&[("a", "Primeira"), ("b", "Segunda"), ("c", "Terceira")]);
+        assert!(plain(&render_progress(&s, 1)).contains("Etapa 2 de 3: Segunda"));
+        assert_eq!(
+            plain(&render_complete("Setup")),
+            "✓ Setup concluído com sucesso!"
+        );
     }
 
     #[test]

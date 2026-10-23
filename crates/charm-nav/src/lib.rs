@@ -20,7 +20,8 @@
 //!
 //! This crate is a faithful port: the default separators, cursors, widths and
 //! styles are identical to the Go implementation, and `next`/`previous` wrap
-//! around cyclically, just like in Go.
+//! around cyclically, just like in Go. Every component also offers `add` and
+//! `remove`, which keep the selection consistent.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -28,6 +29,9 @@
 pub mod breadcrumb;
 pub mod sidebar;
 pub mod tabs;
+
+#[cfg(test)]
+mod tests;
 
 pub use breadcrumb::Breadcrumb;
 pub use sidebar::Sidebar;

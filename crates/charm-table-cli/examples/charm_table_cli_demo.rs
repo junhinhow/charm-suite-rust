@@ -38,7 +38,10 @@ fn main() {
             color: "63".to_owned(),
         };
         println!("{style:?}");
-        println!("{}", render_table(&headers, &rows, &options));
+        match render_table(&headers, &rows, &options) {
+            Ok(table) => print!("{table}"),
+            Err(err) => println!("erro: {err}"),
+        }
         println!();
     }
 }

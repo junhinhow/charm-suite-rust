@@ -5,6 +5,43 @@ All notable changes to this crate are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Synchronized with the Go `charm-dialog` after its keyboard, layout and
+overlay changes.
+
+### Added
+
+- `Action` enum (`None`, `Submit`, `Cancel`), with `Display` printing the same
+  texts as the Go `Action.String()`.
+- `Dialog::set_key_msg(&KeyMsg) -> (Action, bool)` and
+  `Dialog::handle_msg(&Message) -> (Action, bool)`, ported from the Go
+  `SetKeyMsg` and `HandleMsg`. They use `KeyMsg` from `charmed-bubbletea`.
+- `Dialog::set_styles(&mut self, styles)`, the in-place form of the Go
+  `WithStyles`.
+- Tests ported from the Go `dialog_test.go`, covering keys, the overlay
+  centering and the width limit.
+
+### Changed
+
+- `render(width)` limits the box to `width` columns: a long message wraps
+  instead of overflowing. A short dialog keeps its natural width and is then
+  centered.
+- `render_overlay` centers the whole box, not each line, and returns exactly
+  `height` lines joined by `\n`, with no trailing newline. A `height` of `0`
+  returns an empty string.
+- Input dialogs draw the prompt and the field as one block, so there is no
+  blank line between them.
+- The parity golden file is regenerated from the new Go program. Width `20`
+  is no longer part of it (see the known differences in the README).
+- Adds the `charmed-bubbletea` dependency (key handling).
+
+### Known differences
+
+- With a `width` narrower than the button row, the Go output can exceed the
+  width (22 columns for 20) and wrap the buttons differently. The port keeps
+  the box within `width`.
+
 ## [0.1.0]
 
 ### Added

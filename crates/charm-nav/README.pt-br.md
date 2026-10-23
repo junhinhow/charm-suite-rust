@@ -7,7 +7,8 @@ Componentes de navegacao para interfaces de terminal, estilizados com
 
 Este crate e um port Rust da biblioteca Go
 [`github.com/junhinhow/charm-nav`](https://github.com/junhinhow/charm-nav) e
-mantem o comportamento original byte a byte.
+reproduz a renderizacao e o comportamento dela. A saida e verificada contra
+golden files gerados pelo original em Go.
 
 ## Componentes
 
@@ -35,6 +36,8 @@ println!("{}", tabs.render());
 | `previous()` | Volta para a aba anterior (com wraparound) |
 | `active()` | Retorna o indice da aba ativa |
 | `items()` | Retorna todos os rotulos das abas |
+| `add(items)` | Adiciona abas ao final; devolve o indice da primeira adicionada, ou `None` quando `items` esta vazio |
+| `remove(index)` | Remove a aba no indice; devolve o rotulo (string vazia quando o indice e invalido) |
 | `render()` | Renderiza a barra de abas estilizada |
 
 **Campos customizaveis:** `separator`, `active_style`, `inactive_style`
@@ -63,6 +66,8 @@ println!("{}", breadcrumb.render());
 | `push(item)` | Adiciona um item ao final |
 | `pop()` | Remove e retorna o ultimo item (string vazia quando vazio) |
 | `items()` | Retorna todos os itens do breadcrumb |
+| `add(items)` | Adiciona itens ao final; devolve o indice do primeiro adicionado, ou `None` quando `items` esta vazio |
+| `remove(index)` | Remove o item no indice; devolve o rotulo (string vazia quando o indice e invalido) |
 | `render()` | Renderiza o breadcrumb estilizado |
 
 **Campos customizaveis:** `separator`, `active_style`, `inactive_style`
@@ -95,9 +100,24 @@ println!("{}", sidebar.render());
 | `previous()` | Volta para o item anterior (com wraparound) |
 | `selected()` | Retorna o indice do item selecionado |
 | `items()` | Retorna todos os itens do menu |
+| `add(items)` | Adiciona itens ao final; devolve o indice do primeiro adicionado, ou `None` quando `items` esta vazio |
+| `remove(index)` | Remove o item no indice; devolve o rotulo (string vazia quando o indice e invalido) |
 | `render()` | Renderiza o menu lateral estilizado |
 
 **Campos customizaveis:** `width`, `cursor`, `selected_style`, `unselected_style`
+
+**Regras de renderizacao:**
+
+- O cursor e medido em **colunas de exibicao**, nao em bytes. `"▸ "` ocupa 2
+  colunas, mesmo tendo 4 bytes, entao todos os itens continuam alinhados.
+- Itens que nao cabem em `width` sao **truncados**, nunca quebrados em outra
+  linha, para que um rotulo longo nunca saia do terminal.
+- O destaque do item selecionado cobre a **largura inteira da linha**, nao so o
+  texto.
+- `width` e medido em colunas. Zero e renderizado como uma coluna.
+- `remove` mantem a selecao consistente: remover um item anterior ao selecionado
+  mantem o mesmo item selecionado, e remover o proprio item selecionado move a
+  selecao para o proximo.
 
 ## Estilos padrao
 
@@ -114,6 +134,31 @@ println!("{}", sidebar.render());
 | Sidebar | `width` | `20` |
 | Sidebar | `cursor` | `"▸ "` |
 
+## Paridade com o original Go
+
+O golden file `tests/golden/nav.txt` e gerado pelo programa Go em
+`reference/go/charm-nav/cmd/parity`. Ele cobre navegacao, indices fora do
+intervalo, `add` e `remove` em cada componente, largura e cursor customizados,
+truncamento, largura minima e cursor vazio. A comparacao remove codigos ANSI e
+espacos no fim das linhas dos dois lados.
+
+```bash
+cargo run -p charm-parity --bin parity -- gen \
+    crates/charm-nav/tests/golden/nav.txt -- \
+    go run ./reference/go/charm-nav/cmd/parity
+
+cargo test -p charm-nav
+```
+
+## Diferencas conhecidas
+
+| Go | Rust |
+|----|------|
+| `Add(items ...string) int` devolve `-1` quando nada e adicionado | `add(&[&str]) -> Option<usize>` devolve `None` |
+| `Items()` devolve uma copia | `items()` devolve um `&[String]` emprestado, que nao consegue alterar o componente |
+| `Width` e um `int` | `width` e um `usize`, entao larguras negativas nao existem. Zero e renderizado como uma coluna, como no Go |
+| `Remove(index int)` aceita indices negativos | `remove(index: usize)` nao tem indices negativos. Indices invalidos devolvem string vazia, como no Go |
+
 ## Instalacao
 
 ```toml
@@ -121,7 +166,7 @@ println!("{}", sidebar.render());
 charm-nav = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Rust", tag = "v0.1.0" }
 ```
 
-Ainda não publicado no crates.io; instale via git.
+Ainda nao publicado no crates.io; instale via git.
 
 ## Licenca
 

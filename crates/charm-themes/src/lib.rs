@@ -47,8 +47,14 @@ pub mod lipgloss;
 pub mod theme;
 pub mod themes;
 
-pub use bubbles::{BubblesStyles, CursorShape, CursorStyle, HelpStyles, ListStyles, TableStyles, TextAreaStateStyles, TextAreaStyles, TextInputStateStyles, TextInputStyles};
-pub use glamour::{Chroma, StyleBlock, StyleCodeBlock, StyleConfig, StyleList, StylePrimitive, StyleTable, StyleTask};
+pub use bubbles::{
+    BubblesStyles, CursorShape, CursorStyle, HelpStyles, ListStyles, TableStyles,
+    TextAreaStateStyles, TextAreaStyles, TextInputStateStyles, TextInputStyles,
+};
+pub use glamour::{
+    Chroma, StyleBlock, StyleCodeBlock, StyleConfig, StyleList, StylePrimitive, StyleTable,
+    StyleTask,
+};
 pub use lipgloss::LipglossStyles;
 pub use theme::{SyntaxColors, Theme, ThemeError};
 pub use themes::{catppuccin, dracula, get, gruvbox, nord, theme_names, themes, tokyo_night};

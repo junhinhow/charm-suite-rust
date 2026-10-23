@@ -16,8 +16,8 @@
 //!
 //! `spinners.txt` is the human readable report (compared with
 //! [`assert_golden`]) and `spinners_dump.txt` is the raw byte dump, compared
-//! byte-for-byte. The latter is the strong guarantee: every one of the 204
-//! frames of the 30 spinners must be exactly the same sequence of bytes as
+//! byte-for-byte. The latter is the strong guarantee: every one of the 257
+//! frames of the 42 spinners must be exactly the same sequence of bytes as
 //! in the Go source.
 
 use std::fmt::Write as _;
@@ -109,35 +109,47 @@ fn spinner_dump_matches_the_golden_harness() {
 #[test]
 fn every_spinner_is_present_with_its_exact_name() {
     let spinners = all();
-    assert_eq!(spinners.len(), 30);
+    assert_eq!(spinners.len(), 42);
     for name in [
         "Arrow",
         "Balloon",
         "Bar",
+        "Beach",
         "Bounce",
+        "BouncingBar",
+        "Cat",
         "Christmas",
         "Circle",
         "Clock",
         "DNA",
+        "Diamond",
+        "Digits",
         "Dots",
         "Earth",
+        "Ellipsis",
         "Fading",
         "Fire",
         "Flip",
         "Grow",
         "Hearts",
+        "Hexagon",
         "Layer",
         "Line",
         "Matrix",
+        "Money",
         "Monkey",
         "Moon",
+        "Music",
         "Noise",
         "Orbit",
         "Pulse",
+        "Quotes",
+        "Rectangle",
         "Rocket",
         "Soccer",
         "Square",
         "Star",
+        "Target",
         "Toggle",
         "Triangle",
         "Weather",

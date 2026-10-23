@@ -25,7 +25,9 @@ Not yet published on crates.io; install from git.
 
 ### Swatches
 
-Renders one colored block per color, with the hexadecimal value below it.
+Renders one colored block per color, with the hexadecimal value below it. When
+the width is too small for the `#rrggbb` label of every color, the swatches
+are stacked one per row instead, so the requested width is never exceeded.
 
 ```rust
 use charm_core::Rgb;
@@ -39,6 +41,9 @@ let colors = [
 
 println!("{}", show_palette(&colors, 36));
 ```
+
+The hexadecimal label is drawn with a contrast color (black or white, chosen by
+the WCAG relative luminance), so it stays readable on dark and light swatches.
 
 ### The 256 ANSI colors
 
@@ -63,8 +68,8 @@ println!("{}", show_true_color(48, 8));
 
 ### Named themes
 
-Each color is displayed as a block, followed by its name and its hexadecimal
-value.
+Each color is displayed as a swatch, followed by its name and its hexadecimal
+value. The names are sorted alphabetically, so the output is deterministic.
 
 ```rust
 use std::collections::BTreeMap;
@@ -81,8 +86,9 @@ println!("{}", show_theme("Dracula", &colors));
 
 ### Comparing themes
 
-Renders several themes side by side. Colors that are missing from a theme are
-replaced by a dashed placeholder.
+Renders several themes side by side. Each theme becomes a column titled by its
+position (`Theme 1`, `Theme 2`, ...), and each color name becomes a row. Colors
+that are missing from a theme are replaced by a dashed placeholder.
 
 ```rust
 use std::collections::BTreeMap;
@@ -96,7 +102,18 @@ dracula.insert("primary".to_string(), Rgb::rgb(0xff, 0x79, 0xc6));
 let mut nord = BTreeMap::new();
 nord.insert("primary".to_string(), Rgb::rgb(0x88, 0xc0, 0xd0));
 
-println!("{}", compare_themes(&[("Dracula", &dracula), ("Nord", &nord)]));
+println!("{}", compare_themes(&[&dracula, &nord]));
+```
+
+### Handling invalid input
+
+The functions above return an empty string for invalid input. The `try_*`
+variants return an [`Error`] that says what is wrong:
+
+```rust
+use charm_palette::{try_show_palette, Error};
+
+assert_eq!(try_show_palette(&[], 40), Err(Error::NoColors));
 ```
 
 ## API Reference
@@ -107,20 +124,31 @@ println!("{}", compare_themes(&[("Dracula", &dracula), ("Nord", &nord)]));
 | `show_ansi256()` | Render the 256 ANSI colors in a grid |
 | `show_true_color(usize, usize)` | Render a true-color gradient |
 | `show_theme(&str, &BTreeMap<String, Rgb>)` | Render a named theme |
-| `compare_themes(&[(&str, &BTreeMap<String, Rgb>)])` | Render several themes side by side |
+| `compare_themes(&[&BTreeMap<String, Rgb>])` | Render several themes side by side |
+| `try_show_palette(&[Rgb], usize)` | Like `show_palette`, returning `Result` |
+| `try_show_true_color(usize, usize)` | Like `show_true_color`, returning `Result` |
+| `try_show_theme(&str, &BTreeMap<String, Rgb>)` | Like `show_theme`, returning `Result` |
+| `try_compare_themes(&[&BTreeMap<String, Rgb>])` | Like `compare_themes`, returning `Result` |
+
+### Errors
+
+| Variant | Description |
+|---------|-------------|
+| `Error::NoColors` | No color was provided |
+| `Error::NoThemes` | No theme was provided |
+| `Error::InvalidWidth(usize)` | The display width is zero |
+| `Error::InvalidDimensions { width, height }` | A gradient dimension is zero |
 
 ## Known differences from the Go original
 
-* The Go implementation receives `image/color.Color` values and reads them
-  through `RGBA()`, which returns **premultiplied** channels. This port uses the
-  raw channels of `charm_core::Rgb`, so the swatches keep the color the caller
-  asked for. For fully opaque colors — the common case — both implementations
-  produce exactly the same output.
-* The hexadecimal label rendered next to a swatch always shows the opaque
-  `#rrggbb` triplet, even for translucent colors.
-* The Go implementation walks over Go maps, whose iteration order is
-  randomised. This port uses `BTreeMap`, so the colors are always rendered in
-  alphabetical order.
+* The Go implementation receives `image/color.Color` values, which can be nil.
+  This port takes `charm_core::Rgb`, which cannot, so there is no `ErrNilColor`.
+* The Go `*Err` functions return `error`; the `try_*` functions here return
+  `Result<String, Error>`.
+* `try_show_true_color` reports `Error::InvalidDimensions` where the Go
+  `ShowTrueColorErr` reports `ErrInvalidWidth`.
+* `compare_themes` takes the themes without names. The Go function also takes
+  no names, so the columns are titled by their position.
 
 ## Testing
 

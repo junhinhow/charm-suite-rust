@@ -3,7 +3,7 @@
 //! Run with:
 //!
 //! ```text
-//! cargo run -p charm-palette --example demo
+//! cargo run -p charm-palette --example charm_palette_demo
 //! ```
 
 use std::collections::BTreeMap;
@@ -68,10 +68,7 @@ fn main() {
         ("green", Rgb::rgb(0xa3, 0xbe, 0x8c)),
         ("blue", Rgb::rgb(0x81, 0xa1, 0xc1)),
     ]);
-    println!(
-        "{}",
-        compare_themes(&[("Dracula", &dracula), ("Nord", &nord)])
-    );
+    println!("{}", compare_themes(&[&dracula, &nord]));
 
     // ------------------------------------------------------------------
     // The 256 color grid

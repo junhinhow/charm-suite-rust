@@ -3,7 +3,7 @@
 //! Run with:
 //!
 //! ```text
-//! cargo run -p charm-charts --example demo
+//! cargo run -p charm-charts --example charm_charts_demo
 //! ```
 
 use charm_charts::{BarChart, ProgressBar, Sparkline};

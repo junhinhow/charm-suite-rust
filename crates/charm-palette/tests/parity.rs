@@ -2,11 +2,8 @@
 //!
 //! The golden file `tests/golden/palette.txt` is produced by the Go program
 //! `reference/go/charm-palette/cmd/parity`, which exercises the whole public
-//! API and prints a transcript of named blocks.
-//!
-//! The Go original walks over Go maps, whose iteration order is randomised.
-//! The multi-key cases are therefore sorted by their visible (ANSI-stripped)
-//! content on **both** sides, so the transcript stays deterministic.
+//! API and prints a transcript of named blocks. The blocks below mirror that
+//! program one to one.
 
 use std::collections::BTreeMap;
 
@@ -18,49 +15,6 @@ fn block(name: &str, content: &str) -> String {
     format!("=== {name} ===\n{content}\n")
 }
 
-/// Removes the ANSI escape sequences, so blocks can be sorted by content.
-fn strip_ansi(text: &str) -> String {
-    charm_core::strip_ansi(text)
-}
-
-/// Makes the map-ordered output of `show_theme` deterministic.
-fn sort_theme_blocks(out: &str) -> String {
-    let trimmed = out.strip_suffix("\n\n").unwrap_or(out);
-    let mut parts: Vec<&str> = trimmed.split("\n\n").collect();
-    if parts.is_empty() {
-        return out.to_owned();
-    }
-    let head = parts.remove(0);
-    parts.sort_by_cached_key(|part| strip_ansi(part));
-    format!("{head}\n\n{}\n\n", parts.join("\n\n"))
-}
-
-/// Makes the map-ordered output of `compare_themes` deterministic.
-fn sort_compare_themes(out: &str) -> String {
-    let trimmed = out.strip_suffix('\n').unwrap_or(out);
-    let lines: Vec<&str> = trimmed.split('\n').collect();
-    if lines.len() < 3 {
-        return out.to_owned();
-    }
-    let header = lines[0];
-    let body = &lines[1..];
-
-    let mut pairs: Vec<(&str, &str)> = Vec::new();
-    let mut i = 0;
-    while i + 1 < body.len() {
-        pairs.push((body[i], body[i + 1]));
-        i += 2;
-    }
-    pairs.sort_by_cached_key(|(key, _)| strip_ansi(key));
-
-    let mut out_lines: Vec<&str> = vec![header];
-    for (key, swatch) in pairs {
-        out_lines.push(key);
-        out_lines.push(swatch);
-    }
-    format!("{}\n", out_lines.join("\n"))
-}
-
 /// Builds a theme map out of `(name, rgb)` pairs.
 fn theme(entries: &[(&str, Rgb)]) -> BTreeMap<String, Rgb> {
     entries
@@ -70,6 +24,7 @@ fn theme(entries: &[(&str, Rgb)]) -> BTreeMap<String, Rgb> {
 }
 
 /// Builds the full transcript, matching the Go program byte for byte.
+#[allow(clippy::too_many_lines)]
 fn transcript() -> String {
     let dracula = theme(&[
         ("primary", Rgb::rgb(0xff, 0x79, 0xc6)),
@@ -77,7 +32,6 @@ fn transcript() -> String {
         ("bg", Rgb::rgb(0x28, 0x28, 0x28)),
     ]);
     let mono = theme(&[("fg", Rgb::rgb(0xf8, 0xf8, 0xf2))]);
-
     let theme_one = theme(&[
         ("primary", Rgb::rgb(0xff, 0x00, 0x00)),
         ("bg", Rgb::rgb(0x11, 0x11, 0x11)),
@@ -87,11 +41,13 @@ fn transcript() -> String {
         ("fg", Rgb::rgb(0xff, 0xff, 0xff)),
     ]);
     let theme_three = theme(&[("primary", Rgb::rgb(0x00, 0x00, 0xff))]);
+    let long_labels = theme(&[
+        ("configuração", Rgb::rgb(99, 102, 241)),
+        ("nome-de-etapa-muito-comprido", Rgb::rgb(168, 85, 247)),
+    ]);
 
     let blocks = vec![
-        // ----------------------------------------------------------
         // show_palette
-        // ----------------------------------------------------------
         block(
             "palette_basic",
             &show_palette(
@@ -109,45 +65,53 @@ fn transcript() -> String {
             &show_palette(&[Rgb::rgb(0x28, 0x28, 0x28), Rgb::rgb(0xfa, 0xbd, 0x2f)], 8),
         ),
         block(
+            "palette_width_5",
+            &show_palette(&[Rgb::rgb(0x28, 0x28, 0x28), Rgb::rgb(0xfa, 0xbd, 0x2f)], 5),
+        ),
+        block(
+            "palette_vertical_width_20",
+            &show_palette(
+                &[
+                    Rgb::rgb(255, 89, 94),
+                    Rgb::rgb(255, 202, 58),
+                    Rgb::rgb(138, 201, 38),
+                    Rgb::rgb(25, 130, 196),
+                    Rgb::rgb(106, 76, 147),
+                    Rgb::rgb(1, 2, 3),
+                ],
+                20,
+            ),
+        ),
+        block(
             "palette_single",
             &show_palette(&[Rgb::rgb(0xff, 0x79, 0xc6)], 12),
         ),
         block(
-            "palette_wrap5",
-            &show_palette(
-                &[Rgb::rgb(0x28, 0x28, 0x28), Rgb::rgb(0xfa, 0xbd, 0x2f)],
-                10,
-            ),
+            "palette_contrast_dark",
+            &show_palette(&[Rgb::rgb(15, 23, 42)], 20),
+        ),
+        block(
+            "palette_contrast_light",
+            &show_palette(&[Rgb::rgb(240, 230, 140)], 20),
         ),
         block("palette_empty", &show_palette(&[], 40)),
-        // ----------------------------------------------------------
+        block("palette_zero_width", &show_palette(&[Rgb::rgb(1, 2, 3)], 0)),
         // show_ansi256
-        // ----------------------------------------------------------
         block("ansi256", &show_ansi256()),
-        // ----------------------------------------------------------
         // show_true_color
-        // ----------------------------------------------------------
         block("truecolor_16x4", &show_true_color(16, 4)),
         block("truecolor_1x1", &show_true_color(1, 1)),
         block("truecolor_zero", &show_true_color(0, 0)),
-        // ----------------------------------------------------------
         // show_theme
-        // ----------------------------------------------------------
-        block(
-            "theme_multi",
-            &sort_theme_blocks(&show_theme("Dracula", &dracula)),
-        ),
+        block("theme_multi", &show_theme("Dracula", &dracula)),
         block("theme_single", &show_theme("Mono", &mono)),
         block("theme_empty", &show_theme("Empty", &BTreeMap::new())),
-        // ----------------------------------------------------------
+        block("theme_long_labels", &show_theme("Longos", &long_labels)),
         // compare_themes
-        // ----------------------------------------------------------
-        block(
-            "compare_two",
-            &sort_compare_themes(&compare_themes(&[("one", &theme_one), ("two", &theme_two)])),
-        ),
-        block("compare_one", &compare_themes(&[("one", &theme_three)])),
+        block("compare_two", &compare_themes(&[&theme_one, &theme_two])),
+        block("compare_one", &compare_themes(&[&theme_three])),
         block("compare_empty", &compare_themes(&[])),
+        block("compare_long_labels", &compare_themes(&[&long_labels])),
     ];
 
     blocks.join("\n")

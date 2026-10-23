@@ -544,6 +544,185 @@ pub fn fire() -> Spinner {
     )
 }
 
+/// The `Ellipsis` spinner: 3 frames at 120 ms per frame.
+///
+/// Frames (Unicode code points): 002E / 002E 002E / 002E 002E 002E
+pub fn ellipsis() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{002E}".to_owned(),
+            "\u{002E}\u{002E}".to_owned(),
+            "\u{002E}\u{002E}\u{002E}".to_owned(),
+        ],
+        Duration::from_millis(120),
+    )
+}
+
+/// The `Rectangle` spinner: 4 frames at 110 ms per frame.
+///
+/// Frames (Unicode code points): 259B / 259C / 2599 / 259F
+pub fn rectangle() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{259B}".to_owned(),
+            "\u{259C}".to_owned(),
+            "\u{2599}".to_owned(),
+            "\u{259F}".to_owned(),
+        ],
+        Duration::from_millis(110),
+    )
+}
+
+/// The `Diamond` spinner: 2 frames at 180 ms per frame.
+///
+/// Frames (Unicode code points): 25C6 / 25C7
+pub fn diamond() -> Spinner {
+    Spinner::new(
+        vec!["\u{25C6}".to_owned(), "\u{25C7}".to_owned()],
+        Duration::from_millis(180),
+    )
+}
+
+/// The `Hexagon` spinner: 2 frames at 180 ms per frame.
+///
+/// Frames (Unicode code points): 2B22 / 2B21
+pub fn hexagon() -> Spinner {
+    Spinner::new(
+        vec!["\u{2B22}".to_owned(), "\u{2B21}".to_owned()],
+        Duration::from_millis(180),
+    )
+}
+
+/// The `BouncingBar` spinner: 7 frames at 100 ms per frame.
+///
+/// Frames (Unicode code points): 005B 0020 0020 0020 0020 005D / 005B 003D 0020 0020 0020 005D / 005B 003D 003D 0020 0020 005D / 005B 003D 003D 003D 0020 005D / 005B 0020 003D 003D 003D 005D / 005B 0020 0020 003D 003D 005D / 005B 0020 0020 0020 003D 005D
+pub fn bouncingbar() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{005B}\u{0020}\u{0020}\u{0020}\u{0020}\u{005D}".to_owned(),
+            "\u{005B}\u{003D}\u{0020}\u{0020}\u{0020}\u{005D}".to_owned(),
+            "\u{005B}\u{003D}\u{003D}\u{0020}\u{0020}\u{005D}".to_owned(),
+            "\u{005B}\u{003D}\u{003D}\u{003D}\u{0020}\u{005D}".to_owned(),
+            "\u{005B}\u{0020}\u{003D}\u{003D}\u{003D}\u{005D}".to_owned(),
+            "\u{005B}\u{0020}\u{0020}\u{003D}\u{003D}\u{005D}".to_owned(),
+            "\u{005B}\u{0020}\u{0020}\u{0020}\u{003D}\u{005D}".to_owned(),
+        ],
+        Duration::from_millis(100),
+    )
+}
+
+/// The `Digits` spinner: 10 frames at 90 ms per frame.
+///
+/// Frames (Unicode code points): 0030 / 0031 / 0032 / 0033 / 0034 / 0035 / 0036 / 0037 / 0038 / 0039
+pub fn digits() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{0030}".to_owned(),
+            "\u{0031}".to_owned(),
+            "\u{0032}".to_owned(),
+            "\u{0033}".to_owned(),
+            "\u{0034}".to_owned(),
+            "\u{0035}".to_owned(),
+            "\u{0036}".to_owned(),
+            "\u{0037}".to_owned(),
+            "\u{0038}".to_owned(),
+            "\u{0039}".to_owned(),
+        ],
+        Duration::from_millis(90),
+    )
+}
+
+/// The `Quotes` spinner: 4 frames at 150 ms per frame.
+///
+/// Frames (Unicode code points): 0027 / 0022 / 275E / 275F
+pub fn quotes() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{0027}".to_owned(),
+            "\u{0022}".to_owned(),
+            "\u{275E}".to_owned(),
+            "\u{275F}".to_owned(),
+        ],
+        Duration::from_millis(150),
+    )
+}
+
+/// The `Cat` spinner: 6 frames at 130 ms per frame.
+///
+/// Frames (Unicode code points): 1F63A / 1F638 / 1F639 / 1F63B / 1F63C / 1F63D
+pub fn cat() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{1F63A}".to_owned(),
+            "\u{1F638}".to_owned(),
+            "\u{1F639}".to_owned(),
+            "\u{1F63B}".to_owned(),
+            "\u{1F63C}".to_owned(),
+            "\u{1F63D}".to_owned(),
+        ],
+        Duration::from_millis(130),
+    )
+}
+
+/// The `Money` spinner: 4 frames at 200 ms per frame.
+///
+/// Frames (Unicode code points): 1F4B0 / 1F4B5 / 1F4B4 / 1F4B6
+pub fn money() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{1F4B0}".to_owned(),
+            "\u{1F4B5}".to_owned(),
+            "\u{1F4B4}".to_owned(),
+            "\u{1F4B6}".to_owned(),
+        ],
+        Duration::from_millis(200),
+    )
+}
+
+/// The `Beach` spinner: 4 frames at 220 ms per frame.
+///
+/// Frames (Unicode code points): 1F3D6 FE0F / 1F334 / 1F30A / 2600 FE0F
+pub fn beach() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{1F3D6}\u{FE0F}".to_owned(),
+            "\u{1F334}".to_owned(),
+            "\u{1F30A}".to_owned(),
+            "\u{2600}\u{FE0F}".to_owned(),
+        ],
+        Duration::from_millis(220),
+    )
+}
+
+/// The `Music` spinner: 3 frames at 140 ms per frame.
+///
+/// Frames (Unicode code points): 266A / 266B / 266C
+pub fn music() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{266A}".to_owned(),
+            "\u{266B}".to_owned(),
+            "\u{266C}".to_owned(),
+        ],
+        Duration::from_millis(140),
+    )
+}
+
+/// The `Target` spinner: 4 frames at 130 ms per frame.
+///
+/// Frames (Unicode code points): 25CE / 25C9 / 2299 / 25C9
+pub fn target() -> Spinner {
+    Spinner::new(
+        vec![
+            "\u{25CE}".to_owned(),
+            "\u{25C9}".to_owned(),
+            "\u{2299}".to_owned(),
+            "\u{25C9}".to_owned(),
+        ],
+        Duration::from_millis(130),
+    )
+}
+
 /// Returns every predefined spinner, keyed by its display name.
 ///
 /// The keys are exactly the ones used by the Go implementation
@@ -554,7 +733,7 @@ pub fn fire() -> Spinner {
 ///
 /// ```
 /// let spinners = charm_spinner::all();
-/// assert_eq!(spinners.len(), 30);
+/// assert_eq!(spinners.len(), 42);
 /// assert!(spinners.contains_key("Dots"));
 /// ```
 pub fn all() -> BTreeMap<&'static str, Spinner> {
@@ -589,5 +768,17 @@ pub fn all() -> BTreeMap<&'static str, Spinner> {
     spinners.insert("Orbit", orbit());
     spinners.insert("Rocket", rocket());
     spinners.insert("Fire", fire());
+    spinners.insert("Ellipsis", ellipsis());
+    spinners.insert("Rectangle", rectangle());
+    spinners.insert("Diamond", diamond());
+    spinners.insert("Hexagon", hexagon());
+    spinners.insert("BouncingBar", bouncingbar());
+    spinners.insert("Digits", digits());
+    spinners.insert("Quotes", quotes());
+    spinners.insert("Cat", cat());
+    spinners.insert("Money", money());
+    spinners.insert("Beach", beach());
+    spinners.insert("Music", music());
+    spinners.insert("Target", target());
     spinners
 }
