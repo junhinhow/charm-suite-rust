@@ -1,4 +1,4 @@
-﻿//! Screen trait and navigation handle.
+//! Screen trait and navigation handle.
 
 use std::sync::{Arc, Mutex};
 
@@ -51,30 +51,46 @@ pub struct NavHandle {
 impl NavHandle {
     /// Records a push request.
     pub fn push(&self, screen: Box<dyn Screen>, params: Option<serde_json::Value>) -> Option<Cmd> {
-        *self.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(NavRequest::Push(screen, params));
+        *self
+            .pending
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(NavRequest::Push(screen, params));
         None
     }
 
     /// Records a pop request.
     pub fn pop(&self) -> Option<Cmd> {
-        *self.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(NavRequest::Pop);
+        *self
+            .pending
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(NavRequest::Pop);
         None
     }
 
     /// Records a replace request.
     pub fn replace(&self, screen: Box<dyn Screen>) -> Option<Cmd> {
-        *self.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(NavRequest::Replace(screen));
+        *self
+            .pending
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(NavRequest::Replace(screen));
         None
     }
 
     /// Records a reset request.
     pub fn reset(&self) -> Option<Cmd> {
-        *self.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(NavRequest::Reset);
+        *self
+            .pending
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(NavRequest::Reset);
         None
     }
 
     /// Takes the pending request, if any.
     pub(crate) fn take_pending(&self) -> Option<NavRequest> {
-        self.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take()
+        self.pending
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
     }
 }

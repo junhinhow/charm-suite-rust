@@ -1,4 +1,4 @@
-﻿//! Router implementation.
+//! Router implementation.
 
 use std::sync::{Arc, Mutex};
 
@@ -72,7 +72,11 @@ impl Router {
 
     /// Handle used by screens to navigate.
     pub fn nav_handle(&self) -> crate::screen::NavHandle {
-        self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner).nav.clone()
+        self.inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .nav
+            .clone()
     }
 
     /// Pushes a screen and returns the new screen's init command.
@@ -202,12 +206,7 @@ impl Router {
         inner
             .stack
             .iter()
-            .map(|e| {
-                e.screen
-                    .as_ref()
-                    .map(|s| s.title())
-                    .unwrap_or_default()
-            })
+            .map(|e| e.screen.as_ref().map(|s| s.title()).unwrap_or_default())
             .collect()
     }
 
@@ -272,7 +271,9 @@ impl Router {
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, RouterInner> {
-        self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     // --- Model trait helpers (called by the impl below) ---
@@ -294,8 +295,7 @@ impl Router {
         // get current screen arc
         let screen_present = {
             let inner = self.lock();
-            !inner.stack.is_empty()
-                && inner.stack[inner.stack.len() - 1].screen.is_some()
+            !inner.stack.is_empty() && inner.stack[inner.stack.len() - 1].screen.is_some()
         };
         if !screen_present {
             return None;
@@ -310,7 +310,11 @@ impl Router {
         // process pending navigation
         let pending = {
             let inner = self.lock();
-            inner.stack.last().and_then(|e| e.screen.as_ref()).and_then(|s| s.nav_handle())
+            inner
+                .stack
+                .last()
+                .and_then(|e| e.screen.as_ref())
+                .and_then(|s| s.nav_handle())
         };
         let mut result = cmd;
         if let Some(handle) = pending {

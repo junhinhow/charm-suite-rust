@@ -1,4 +1,4 @@
-﻿//! A screen stack for Bubble Tea v2 applications.
+//! A screen stack for Bubble Tea v2 applications.
 //!
 //! The [`Router`] is the root model of the program: it delegates events to the
 //! top screen, keeps the terminal size and forwards it to every screen on the
