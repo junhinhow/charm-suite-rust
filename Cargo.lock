@@ -211,6 +211,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "charm-fuzzy"
+version = "0.1.0"
+dependencies = [
+ "charm-core",
+ "charm-parity",
+ "lipgloss",
+]
+
+[[package]]
 name = "charm-i18n"
 version = "0.1.0"
 dependencies = [
