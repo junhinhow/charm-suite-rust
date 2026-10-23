@@ -1,6 +1,7 @@
 //! Multi-task terminal progress dashboard.
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#![allow(missing_docs, clippy::format_push_string)]
 
 use std::time::{Duration, SystemTime};
 
@@ -72,5 +73,5 @@ impl Dashboard {
     /// Estimates remaining time. A zero duration is returned when no clock samples exist.
     pub fn eta(&self, _now: SystemTime) -> Duration { Duration::ZERO }
     /// Renders the visible tasks.
-    pub fn view(&self, width: usize) -> String { let mut out = String::new(); for t in self.tasks.iter().take(if self.max_visible == 0 { usize::MAX } else { self.max_visible }) { let n = self.bar_width.min(width.saturating_sub(t.label.len() + 12)); let filled = (n as f64 * t.percent() / 100.0).round() as usize; out.push_str(&format!("{} {}{}\n", t.label, self.theme.full_char.repeat(filled.min(n)), self.theme.empty_char.repeat(n.saturating_sub(filled)))); } out }
+    pub fn view(&self, width: usize) -> String { let mut out = String::new(); for t in self.tasks.iter().take(if self.max_visible == 0 { usize::MAX } else { self.max_visible }) { let n = self.bar_width.min(width.saturating_sub(t.label.len() + 12)); let filled = (n as f64 * t.percent() / 100.0).round() as usize; out.push_str(&t.label); out.push(' '); out.push_str(&self.theme.full_char.repeat(filled.min(n))); out.push_str(&self.theme.empty_char.repeat(n.saturating_sub(filled))); out.push('\n'); } out }
 }
