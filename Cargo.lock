@@ -476,6 +476,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "charm-progress"
+version = "0.1.0"
+dependencies = [
+ "lipgloss",
+]
+
+[[package]]
 name = "charm-record"
 version = "0.1.0"
 dependencies = [
@@ -543,22 +550,38 @@ dependencies = [
 name = "charm-suite"
 version = "0.1.0"
 dependencies = [
+ "charm-a11y",
  "charm-banner",
  "charm-charts",
  "charm-color",
+ "charm-command",
+ "charm-config",
  "charm-devtools",
  "charm-dialog",
  "charm-diff",
  "charm-form",
+ "charm-fuzzy",
  "charm-i18n",
+ "charm-image",
+ "charm-input",
+ "charm-json",
+ "charm-keys",
  "charm-layout",
+ "charm-logs",
+ "charm-mock",
  "charm-nav",
  "charm-notify",
  "charm-palette",
+ "charm-panes",
+ "charm-progress",
+ "charm-record",
+ "charm-router",
  "charm-spinner",
+ "charm-store",
  "charm-test",
  "charm-themes",
  "charm-toast",
+ "charm-update",
  "charm-wizard",
 ]
 

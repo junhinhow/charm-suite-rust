@@ -13,6 +13,7 @@ categories = ["command-line-interface"]
 readme = "README.md"
 
 [dependencies]
+charm-a11y = { path = "../charm-a11y", version = "0.1.0", optional = true }
 charm-banner = { path = "../charm-banner", version = "0.1.0", optional = true }
 charm-charts = { path = "../charm-charts", version = "0.1.0", optional = true }
 charm-color = { path = "../charm-color", version = "0.1.0", optional = true }
@@ -30,26 +31,57 @@ charm-test = { path = "../charm-test", version = "0.1.0", optional = true }
 charm-themes = { path = "../charm-themes", version = "0.1.0", optional = true }
 charm-toast = { path = "../charm-toast", version = "0.1.0", optional = true }
 charm-wizard = { path = "../charm-wizard", version = "0.1.0", optional = true }
+charm-command = { path = "../charm-command", version = "0.1.0", optional = true }
+charm-config = { path = "../charm-config", version = "0.1.0", optional = true }
+charm-fuzzy = { path = "../charm-fuzzy", version = "0.1.0", optional = true }
+charm-image = { path = "../charm-image", version = "0.1.0", optional = true }
+charm-input = { path = "../charm-input", version = "0.1.0", optional = true }
+charm-json = { path = "../charm-json", version = "0.1.0", optional = true }
+charm-keys = { path = "../charm-keys", version = "0.1.0", optional = true }
+charm-logs = { path = "../charm-logs", version = "0.1.0", optional = true }
+charm-mock = { path = "../charm-mock", version = "0.1.0", optional = true }
+charm-panes = { path = "../charm-panes", version = "0.1.0", optional = true }
+charm-progress = { path = "../charm-progress", version = "0.1.0", optional = true }
+charm-record = { path = "../charm-record", version = "0.1.0", optional = true }
+charm-router = { path = "../charm-router", version = "0.1.0", optional = true }
+charm-store = { path = "../charm-store", version = "0.1.0", optional = true }
+charm-update = { path = "../charm-update", version = "0.1.0", optional = true }
 
 [features]
 default = ["full"]
-full = ["banner", "charts", "color", "devtools", "dialog", "diff", "form", "i18n", "layout", "nav", "notify", "palette", "spinner", "test", "themes", "toast", "wizard"]
+full = ["a11y", "banner", "charts", "color", "command", "config", "devtools", "dialog", "diff", "form", "fuzzy", "i18n", "image", "input", "json", "keys", "layout", "logs", "mock", "nav", "notify", "palette", "panes", "progress", "record", "router", "spinner", "store", "test", "themes", "toast", "update", "wizard"]
+a11y = ["dep:charm-a11y"]
 banner = ["dep:charm-banner"]
+command = ["dep:charm-command"]
+config = ["dep:charm-config"]
 charts = ["dep:charm-charts"]
 color = ["dep:charm-color"]
 devtools = ["dep:charm-devtools"]
 dialog = ["dep:charm-dialog"]
 diff = ["dep:charm-diff"]
 form = ["dep:charm-form"]
+fuzzy = ["dep:charm-fuzzy"]
 i18n = ["dep:charm-i18n"]
+image = ["dep:charm-image"]
+input = ["dep:charm-input"]
+json = ["dep:charm-json"]
+keys = ["dep:charm-keys"]
 layout = ["dep:charm-layout"]
+logs = ["dep:charm-logs"]
+mock = ["dep:charm-mock"]
 nav = ["dep:charm-nav"]
 notify = ["dep:charm-notify"]
 palette = ["dep:charm-palette"]
+panes = ["dep:charm-panes"]
+progress = ["dep:charm-progress"]
+record = ["dep:charm-record"]
+router = ["dep:charm-router"]
 spinner = ["dep:charm-spinner"]
+store = ["dep:charm-store"]
 test = ["dep:charm-test"]
 themes = ["dep:charm-themes"]
 toast = ["dep:charm-toast"]
+update = ["dep:charm-update"]
 wizard = ["dep:charm-wizard"]
 
 [lints]
