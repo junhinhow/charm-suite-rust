@@ -1,10 +1,13 @@
 [package]
 name = "charm-progress"
+description = "Multi-task progress dashboard for terminal applications."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
 readme = "README.md"
 
 [dependencies]

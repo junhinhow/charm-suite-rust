@@ -10,6 +10,9 @@ yanked = "warn"
 ignore = [
     { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 transitivo via charmed-bubbletea-macros; sem upgrade seguro" },
     { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml transitivo via serde_yaml_ng; sem upgrade seguro" },
+    { id = "RUSTSEC-2026-0367", reason = "zip e usado para ler membros selecionados; o crate nao chama ZipArchive::extract" },
+    { id = "RUSTSEC-2026-0368", reason = "zip e usado para ler membros selecionados; o crate nao chama ZipArchive::extract" },
+    { id = "RUSTSEC-2026-0369", reason = "zip e usado para ler membros selecionados; o crate nao chama ZipArchive::extract" },
 ]
 
 [licenses]
@@ -23,6 +26,7 @@ allow = [
     "Unicode-3.0",
     "Zlib",
     "MPL-2.0",
+    "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
 
