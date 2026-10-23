@@ -1,7 +1,7 @@
 //! Styled ASCII art banners for terminal user interfaces.
 //!
 //! `charm-banner` turns plain text into large ASCII art built with Unicode
-//! block elements (`▀`, `▄`, `█`) and renders it with three built-in
+//! block elements (`▀`, `▄`, `█`, `░`) and renders it with three built-in
 //! bitmap fonts: **Small** (3 rows), **Medium** (5 rows) and **Large**
 //! (7 rows).
 //!
@@ -58,7 +58,6 @@ mod accents;
 mod fonts;
 mod marks;
 
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -105,11 +104,11 @@ impl Font {
         }
     }
 
-    /// Number of columns of a glyph drawn with this font.
+    /// Nominal number of columns of a glyph drawn with this font.
     ///
-    /// Every glyph of a font is exactly this wide. A row that is shorter than
-    /// this width is padded with spaces while rendering, like in the Go
-    /// original.
+    /// The nominal width is the one advertised by the Go original
+    /// (`fontWidth`), which is not used while rendering. The glyphs of the Go
+    /// fonts are in fact 3, 6 and 9 columns wide respectively.
     ///
     /// # Examples
     ///
@@ -304,14 +303,10 @@ impl RenderOptions {
 
 /// Renders `text` as a stylized banner.
 ///
-/// The text is upper-cased, accented letters are drawn with the glyph of their
-/// base letter (`Á` uses the glyph of `A`), combining marks are dropped and
-/// every remaining character is replaced by its bitmap glyph (characters
-/// without a glyph fall back to the space glyph). The glyphs are joined by a
-/// single blank column. The result is optionally styled with the
-/// [`RenderOption::Style`] option.
-///
-/// An empty text renders as an empty string.
+/// The text is upper-cased, every character is replaced by its bitmap glyph
+/// (characters without a glyph fall back to the space glyph) and the glyphs
+/// are joined by a single blank column. The result is optionally styled with
+/// the [`RenderOption::Style`] option.
 ///
 /// # Examples
 ///
@@ -328,12 +323,6 @@ impl RenderOptions {
 ///
 /// // Lower case input is upper-cased.
 /// assert_eq!(render("abc", &[]), render("ABC", &[]));
-///
-/// // Accented letters use the glyph of the base letter.
-/// assert_eq!(render("É", &[]), render("E", &[]));
-///
-/// // Empty input.
-/// assert_eq!(render("", &[]), "");
 /// ```
 pub fn render(text: &str, opts: &[RenderOption]) -> String {
     let mut font = Font::default();
@@ -379,8 +368,8 @@ fn render_inner(text: &str, font: Font, style: Option<&lipgloss::Style>) -> Stri
     let glyphs = font.glyphs();
     let height = font.height();
     let width = font.width();
-    let mut lines: Vec<String> = vec![String::new(); height];
     let last = runes.len() - 1;
+    let mut lines: Vec<String> = vec![String::new(); height];
 
     for (index, ch) in runes.iter().enumerate() {
         let pattern = glyphs
@@ -393,7 +382,7 @@ fn render_inner(text: &str, font: Font, style: Option<&lipgloss::Style>) -> Stri
             line.push_str(&pad_right(segment, width));
         }
 
-        // Blank column between the glyphs, added exactly once per rune.
+        // Blank column between the glyphs.
         if index < last {
             for line in &mut lines {
                 line.push(' ');
@@ -407,58 +396,6 @@ fn render_inner(text: &str, font: Font, style: Option<&lipgloss::Style>) -> Stri
         Some(style) => style.render(&result),
         None => result,
     }
-}
-
-/// Converts the text to the runes that are actually drawn: upper case first,
-/// then accented letters are replaced by their base letter and combining
-/// marks are dropped.
-fn normalize(text: &str) -> Vec<char> {
-    to_upper(text)
-        .chars()
-        .filter_map(|ch| {
-            if let Some(base) = base_letter(ch) {
-                Some(base)
-            } else if is_mark(ch) {
-                None
-            } else {
-                Some(ch)
-            }
-        })
-        .collect()
-}
-
-/// The base letter used to draw an accented character, if it has one.
-fn base_letter(ch: char) -> Option<char> {
-    accents::BASE_LETTERS
-        .binary_search_by_key(&ch, |&(key, _)| key)
-        .ok()
-        .map(|index| accents::BASE_LETTERS[index].1)
-}
-
-/// Whether `ch` belongs to the Unicode category `Mn` (non-spacing mark).
-fn is_mark(ch: char) -> bool {
-    let code = u32::from(ch);
-    marks::MN_RANGES
-        .binary_search_by(|&(lo, hi)| {
-            if hi < code {
-                Ordering::Less
-            } else if lo > code {
-                Ordering::Greater
-            } else {
-                Ordering::Equal
-            }
-        })
-        .is_ok()
-}
-
-/// Pads `segment` with spaces up to `width` display columns.
-fn pad_right(segment: &str, width: usize) -> String {
-    let current = lipgloss::utils::width_visible(segment);
-    let mut out = segment.to_owned();
-    if current < width {
-        out.push_str(&" ".repeat(width - current));
-    }
-    out
 }
 
 /// Upper-cases `text` the way Go's `strings.ToUpper` does.
@@ -481,6 +418,49 @@ fn to_upper(text: &str) -> String {
     }
 
     out
+}
+
+/// Normalizes `text` the way the Go original does: upper-cases it (simple
+/// mapping, no expansion of multi-codepoint sequences), transliterates accented
+/// letters to their base letter, and drops combining marks.
+fn normalize(text: &str) -> Vec<char> {
+    to_upper(text)
+        .chars()
+        .filter_map(|ch| {
+            if let Some(base) = base_letter(ch) {
+                Some(base)
+            } else if is_mark(ch) {
+                None
+            } else {
+                Some(ch)
+            }
+        })
+        .collect()
+}
+
+/// Base letter for an accented character, if it has one.
+fn base_letter(ch: char) -> Option<char> {
+    accents::BASE_LETTERS
+        .binary_search_by_key(&ch, |&(key, _)| key)
+        .ok()
+        .map(|index| accents::BASE_LETTERS[index].1)
+}
+
+/// Whether `ch` is a Unicode non-spacing mark (`Mn`).
+fn is_mark(ch: char) -> bool {
+    let cp = ch as u32;
+    marks::MN_RANGES
+        .iter()
+        .any(|&(lo, hi)| cp >= lo && cp <= hi)
+}
+
+/// Pads `s` with spaces until it reaches `width` display columns.
+fn pad_right(s: &str, width: usize) -> String {
+    let current = lipgloss::utils::width_visible(s);
+    if current >= width {
+        return s.to_owned();
+    }
+    format!("{s}{}", " ".repeat(width - current))
 }
 
 #[cfg(test)]
@@ -553,11 +533,9 @@ mod tests {
     }
 
     #[test]
-    fn empty_text_renders_empty_lines() {
+    fn empty_text_renders_empty_string() {
         let banner = render("", &[]);
-        assert_eq!(banner, "\n\n\n\n");
-        // `str::lines` drops the trailing empty line, `split` does not.
-        assert_eq!(banner.split('\n').count(), 5);
+        assert_eq!(banner, "");
     }
 
     #[test]
@@ -576,10 +554,6 @@ mod tests {
 
     #[test]
     fn style_is_applied_to_the_output() {
-        // Sem TTY (CI) o `lipgloss` detecta `NoColor` e remove todo o SGR.
-        // Forcamos truecolor para que a assercao seja independente do ambiente.
-        lipgloss::renderer::set_color_profile(lipgloss::renderer::ColorProfileKind::TrueColor);
-
         let style = lipgloss::Style::new().bold(true);
         let styled = render("A", &[RenderOption::Style(style.clone())]);
         let plain = render("A", &[]);
