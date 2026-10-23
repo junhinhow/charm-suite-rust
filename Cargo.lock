@@ -267,6 +267,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "charm-router"
+version = "0.1.0"
+dependencies = [
+ "charm-core",
+ "charm-parity",
+ "charmed-bubbletea",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "charm-showcase"
 version = "0.1.0"
 dependencies = [
