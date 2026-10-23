@@ -1,0 +1,109 @@
+## detect
+vazio: a11y: color=on unicode=on width=unknown
+no-color-vazio: a11y: color=on unicode=on width=unknown
+no-color-1: a11y: color=off unicode=off width=unknown
+no-color-0: a11y: color=off unicode=off width=unknown
+clicolor-0: a11y: color=off unicode=off width=unknown
+dumb: a11y: color=off unicode=off width=unknown dumb screen-reader
+term-comum: a11y: color=on unicode=on width=unknown
+high-contrast: a11y: color=on unicode=on width=unknown high-contrast
+reduced-motion: a11y: color=on unicode=on width=unknown reduced-motion
+screen-reader: a11y: color=on unicode=on width=unknown screen-reader
+ascii: a11y: color=on unicode=off width=unknown
+a11y-ascii-falso: a11y: color=on unicode=on width=unknown
+columns: a11y: color=on unicode=on width=120
+columns-invalido: a11y: color=on unicode=on width=unknown
+columns-negativo: a11y: color=on unicode=on width=unknown
+combinacao: a11y: color=off unicode=off width=40 dumb high-contrast reduced-motion screen-reader
+espacos: a11y: color=off unicode=off width=unknown high-contrast
+## symbol
+✓ ok
+## sanitize
+unicode: ┌─┐
+│✓│
+└─┘ → 100% …
+ascii: +-+
+|v|
++-+ -> 100% ...
+unicode: corpo ★ «ok» ±1 ≤ ≥
+ascii: corpo * <<ok>> +/-1 <= >=
+unicode: 世界 ✓ ▶ ◀ • ≠ ≈ × ÷
+ascii: 世界 v > < * != ~ x /
+unicode: ┌─┐ ✓ 世界
+ascii: +-+ v 世界
+## borders
+normal:
++--+
+|ok|
++--+
+rounded:
++--+
+|ok|
++--+
+thick:
++--+
+|ok|
++--+
+double:
++==+
+|ok|
++==+
+block:
+####
+#ok#
+####
+outer-half-block:
++^^+
+[ok]
++__+
+rounded-unicode:
+╭──╮
+│ok│
+╰──╯
+## style
+no-color-unicode:
+╭───╮
+│ x │
+╰───╯
+no-color-ascii:
++---+
+| x |
++---+
+zero-profile:
+[38;2;0;0;255m+---+[m
+[38;2;0;0;255m|[m[48;2;0;255;0m [m[38;2;255;0;0;48;2;0;255;0mx[m[48;2;0;255;0m [m[38;2;0;0;255m|[m
+[38;2;0;0;255m+---+[m
+high-contrast:
+[1mdim[m
+## frames
+a b c
+a
+
+
+## announce
+ok tudo certo !
+a b c
+corpo
+a b c
+100% [pronto]
+ação concluída: ✓
+etapa 2 de 3
+
+## strip
+strip: vermelho
+strip: X
+strip: tela
+strip: segredo
+strip: corpo
+strip: link
+strip: texto
+strip: 
+strip: a[0] = [31m]
+strip: 100% [ok]
+strip: Olá, 世界! 🎉
+strip: abc
+strip: 
+strip: 
+strip: ok
+strip: 
+strip: 

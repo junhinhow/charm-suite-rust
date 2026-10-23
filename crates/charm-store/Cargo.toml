@@ -1,0 +1,25 @@
+[package]
+name = "charm-store"
+description = "Estado observavel para TUIs: store tipado com inscricoes, undo/redo limitado e snapshots."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["state", "store", "tui", "undo", "observable"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+charm-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+charm-parity = { path = "../../tools/parity" }
+
+[lints]
+workspace = true

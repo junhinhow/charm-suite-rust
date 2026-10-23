@@ -20,6 +20,16 @@ Legenda da coluna **Impacto**: o que muda para quem usa a biblioteca ou a CLI.
 
 | Crate | Diferença | Motivo | Impacto |
 |---|---|---|---|
+| `charm-a11y` | `Profile::default_profile()` substitui a função `Default()`; o trait `Default` do Rust dá o valor zero, como o Go | Rust não permite uma função `Default()` com o nome do trait; o valor zero é preservado | Use `Profile::default_profile()` para o perfil do processo |
+| `charm-a11y` | `detect_from` recebe `Fn(&str) -> Option<String>`; não existe `getenv` `nil` | `Option` é idiomático; variável ausente é `None` | Para ambiente vazio, use `\|_\| None` |
+| `charm-a11y` | `announce` recebe a mensagem já formatada, sem string de formato e argumentos | Rust não tem `printf`; `format!` produz o mesmo texto | Use `format!` onde o Go passa formato e argumentos |
+| `charm-a11y` | `width` é `usize` (`0` = desconhecido); valores negativos de `COLUMNS` viram `0` | Tipo sem sinal | Mesmo resultado do Go para `COLUMNS` inválido ou negativo |
+| `charm-a11y` | `style` consome o `Style` recebido e `border` recebe `Border` por cópia | Ownership do Rust (o Go passa por valor) | Mesmo resultado; a entrada não pode ser reutilizada depois |
+| `charm-a11y` | Sem `UnderlineColor`, `BorderForegroundBlend` e getters de cor por lado da borda no lipgloss 0.1.x | Limitação da biblioteca `lipgloss` 0.1.x | Esses recursos não existem no estilo Rust; a paridade é verificada pela saída renderizada |
+| `charm-a11y` | `strip_ansi` é um removedor próprio que mantém controles C0 (tab, LF, NUL), como `ansi.Strip` do Go; o `strip_ansi` do `charm_core` (via lipgloss 0.1.x) remove tabs | Paridade com o Go; a biblioteca usada pelo `charm_core` diverge | Entradas com tabs ou outros controles podem ter resultado diferente do `charm_core::strip_ansi` |
+| `charm-a11y` | `transliterate` é público (no Go é interno) | Pedido de API; útil para bordas e textos | Adição; não quebra nada |
+| `charm-a11y` | Partes de borda que misturam glifos conhecidos e desconhecidos são internadas com `Box::leak` | `lipgloss::Border` guarda `&'static str`; partes padrão reusam a tabela sem alocar | Vazamento limitado ao número de partes distintas; bordas padrão não vazam |
+| `charm-a11y` | Entradas são `&str`, então bytes UTF-8 inválidos não existem; os testes Go de byte inválido usam U+FFFD | `String` do Rust é sempre UTF-8 válido | Entrada inválida não chega à biblioteca |
 | `charm-banner` | Glifos de `fontWidth` irregulares: o Go declara 3, 5 e 7 colunas, mas os glifos têm 3, 6 e 9 | Dado do Go é reproduzido sem alteração; a função não é usada na renderização | Nenhum no render |
 | `charm-banner` | Coluna em branco após caracteres multibyte (ex.: `É`), porque o Go compara offset em bytes com tamanho em bytes | Bug do Go, reproduzido byte a byte para manter paridade | Espaçamento igual ao Go em texto não ASCII |
 | `charm-banner` | Maiúsculas com mapeamento simples (`ß` continua `ß`); `str::to_uppercase` usaria o mapeamento completo (`ß` vira `SS`) | Mantém o número de glifos renderizados igual ao Go | Só afeta textos com caracteres cujo maiúsculo tem mais de um caractere |
@@ -35,6 +45,14 @@ Legenda da coluna **Impacto**: o que muda para quem usa a biblioteca ou a CLI.
 | `charm-spinner` | `Render(frame int)` aceita índice negativo (conta a partir do fim) no Go; no Rust, `render(frame: usize)` não tem índice negativo | Tipo sem sinal idiomático | Use `frames.len() - n` para contar a partir do fim |
 | `charm-spinner` | `spinner.Clone()` do Go devolve uma cópia do mapa; no Rust, `all()` já devolve uma cópia nova a cada chamada | Ownership do Rust | Não há função `clone` separada |
 | `charm-spinner` | `render` com zero frames retorna string vazia; o Go entra em pânico | Biblioteca não deve entrar em pânico | Caso de borda sem erro |
+| `charm-store` | `Store` guarda o estado em `Arc<Mutex<..>>` e todos os métodos recebem `&self`, em vez de `&mut self` sem lock | O Go documenta uso concorrente seguro, e o cancelamento de inscrição precisa de estado compartilhado | Pode ser usado de várias threads sem `Mutex` externo; `Store` não é `Clone` (use `Arc<Store<T>>`) |
+| `charm-store` | `subscribe` aceita `Fn(T) + Send + Sync` (não `FnMut`); o estado do observador fica em `Mutex` ou atômicos | Observadores podem rodar em outras threads | Closures que alteram variáveis capturadas precisam de `Mutex` ou atômicos |
+| `charm-store` | Não há argumentos `nil`: `Update(nil)`, `Subscribe(nil)`, `Snapshot(nil)`, `Restore(nil)` e `Select(nil, ...)` não existem | O sistema de tipos rejeita os casos | Nenhum erro de runtime; o Go entra em panic em `Select` com `nil` |
+| `charm-store` | `Set`/`Update` comparam com `PartialEq` (Go: `reflect.DeepEqual`); `NaN` continua sempre diferente | Equivalente estrutural em Rust | Igual ao Go |
+| `charm-store` | `Subscribe` devolve `impl Fn()` em vez de `func()`; o cancelamento é idempotente, como no Go | Tipo de retorno idiomático | Ajuste de código |
+| `charm-store` | `Codec` tem métodos genéricos `marshal`/`unmarshal` que devolvem `Result` com `CodecError` (boxed); `unmarshal` devolve o valor em vez de preencher `any` | Não há `any` em Rust; a integração usa `serde` | Implementações de codec externas têm outra forma |
+| `charm-store` | Mensagens de erro estão em inglês (`store: failed to create snapshot`) e o texto de `restore` diz "restore" em vez de "restaurar" | Convenção de erros em inglês do crates.io | Texto diferente; `Error::Snapshot` e `Error::Restore` correspondem aos erros do Go |
+| `charm-store` | `JSONCodec()` vira `JsonCodec` (struct unitária); `set_history_limit` recebe `usize`, então valores negativos não existem e `0` vira `1` | Nomenclatura e tipo sem sinal | Ajuste de código |
 | `charm-toast` | Sem `sync.Mutex`: a API é síncrona com `&mut self` | Ownership do Rust torna o lock desnecessário | Uso concorrente exige `Mutex` do chamador |
 | `charm-toast` | `CreatedAt time.Time` vira `created_at: Instant` (monotônico) | A expiração não é afetada por mudanças do relógio do sistema | Tipo diferente; não é uma data civil |
 | `charm-toast` | `ToastType.String()` vira `label()`, e há `Display` | Nomenclatura Rust | Chamadores precisam trocar a chamada |

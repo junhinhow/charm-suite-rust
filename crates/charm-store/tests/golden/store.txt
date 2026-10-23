@@ -1,0 +1,32 @@
+notify:1
+notify:2
+get=2 history=2 canUndo=true canRedo=false
+notify:1
+undo=true
+get=1 history=1 canRedo=true
+notify:2
+redo=true
+get=2 canUndo=true
+notify:5
+canRedo=false
+get=6 history=4
+history=2
+undo=true get=3
+undo=true get=2
+undo=false get=2
+redo=true get=3
+history=1
+dobro:2
+dobro:6
+dobro=6 history=0 canUndo=false
+undo=false redo=false
+dobro=6
+tamanho:2
+tamanho=2
+snapshot err=false data={"nome":"segundo","itens":["b","c"]}
+restore-notify:segundo:b,c
+restore err=false nome=segundo itens=b,c history=0 canUndo=false
+restore-notify:segundo:b,c
+restore igual err=false
+restore invalido err=true nome=segundo
+inteiro=0

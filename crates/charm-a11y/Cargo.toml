@@ -1,0 +1,22 @@
+[package]
+name = "charm-a11y"
+description = "Perfis de acessibilidade para terminais: NO_COLOR, ASCII, movimento reduzido e texto linear para leitores de tela."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["a11y", "accessibility", "terminal", "tui", "charm"]
+categories = ["command-line-interface"]
+readme = "README.md"
+
+[dependencies]
+lipgloss.workspace = true
+
+[dev-dependencies]
+charm-parity = { path = "../../tools/parity" }
+
+[lints]
+workspace = true

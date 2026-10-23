@@ -113,6 +113,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
+name = "charm-a11y"
+version = "0.1.0"
+dependencies = [
+ "charm-parity",
+ "lipgloss",
+]
+
+[[package]]
 name = "charm-banner"
 version = "0.1.0"
 dependencies = [
@@ -286,6 +294,17 @@ version = "0.1.0"
 dependencies = [
  "charm-parity",
  "lipgloss",
+]
+
+[[package]]
+name = "charm-store"
+version = "0.1.0"
+dependencies = [
+ "charm-core",
+ "charm-parity",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
