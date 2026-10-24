@@ -20,7 +20,9 @@
 //!
 //! impl Screen for Home {
 //!     fn init(&self) -> Option<Cmd> { None }
-//!     fn update(&mut self, _msg: Message) -> Option<Cmd> { None }
+//!     fn update(&mut self, _msg: Message) -> (charm_router::ScreenUpdate, Option<Cmd>) {
+//!         (charm_router::ScreenUpdate::Keep, None)
+//!     }
 //!     fn view(&self) -> String { format!("home {}x{}", self.width, self.height) }
 //!     fn title(&self) -> String { "Home".to_owned() }
 //!     fn set_size(&mut self, w: i32, h: i32) { self.width = w; self.height = h; }
@@ -40,7 +42,7 @@ mod router;
 mod screen;
 
 pub use router::{Guard, NavRequest, Router};
-pub use screen::{NavHandle, Screen};
+pub use screen::{NavHandle, Screen, ScreenUpdate};
 
 /// Convenience alias for the result of `params_as`.
 pub type ParamsResult<T> = (Option<T>, bool);

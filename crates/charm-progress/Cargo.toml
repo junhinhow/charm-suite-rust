@@ -12,6 +12,8 @@ readme = "README.md"
 
 [dependencies]
 lipgloss.workspace = true
+unicode-width.workspace = true
+strip-ansi-escapes.workspace = true
 
 [lints]
 workspace = true

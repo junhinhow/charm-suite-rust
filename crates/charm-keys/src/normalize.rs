@@ -190,3 +190,36 @@ fn canonical_final(s: &str, has_mods: bool) -> String {
 
     lower
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn complete_normalization_cases() {
+        for (input, expected) in [
+            ("C-A-x", "ctrl+alt+x"),
+            ("alt+ctrl+x", "ctrl+alt+x"),
+            ("Control+C", "ctrl+c"),
+            ("escape", "esc"),
+            ("return", "enter"),
+            ("spacebar", "space"),
+            (" ", "space"),
+            ("del", "delete"),
+            ("page-down", "pgdown"),
+            ("pgdn", "pgdown"),
+            ("C-M-x", "ctrl+meta+x"),
+            ("ctrl++", "ctrl++"),
+            ("+", "+"),
+            ("A", "A"),
+            ("ctrl+A", "ctrl+a"),
+            ("f63", "f63"),
+            ("f64", "f64"),
+        ] {
+            assert_eq!(normalize_key(input), expected, "{input:?}");
+        }
+        for input in ["", "  ", "foo+bar"] {
+            assert_eq!(normalize_key(input), "", "{input:?}");
+        }
+    }
+}

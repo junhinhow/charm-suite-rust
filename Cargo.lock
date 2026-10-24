@@ -480,6 +480,8 @@ name = "charm-progress"
 version = "0.1.0"
 dependencies = [
  "lipgloss",
+ "strip-ansi-escapes",
+ "unicode-width",
 ]
 
 [[package]]
@@ -503,6 +505,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "unicode-width",
 ]
 
 [[package]]

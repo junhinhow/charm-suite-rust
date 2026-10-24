@@ -1,0 +1,76 @@
+=== ajuda lista ===
+enter  abrir
+d  apagar
+x  sair da lista
+?  ajuda
+=== ajuda largura 40 ===
+enter  abrir      x  sair da lista
+d  apagar         ?  ajuda
+=== ajuda largura 20 ===
+enter  abrir
+d  apagar
+x  sair da lista
+?  ajuda
+=== ajuda largura 0 ===
+
+=== ativos lista ===
+active=[global list]
+=== resolve lista ===
+ctrl+c=quit
+enter=open
+x=quit
+z=none
+?=help
+=== push modal ===
+=== ajuda modal ===
+enter  confirmar
+esc  cancelar
+d  apagar no modal
+x  sair da lista
+?  ajuda
+=== resolve modal ===
+enter=confirm
+d=modal-delete
+esc=cancel
+x=quit
+?=help
+=== pop ===
+pop=modal:confirm
+active=[global list]
+pop=list
+pop=
+active=[global]
+=== ajuda global ===
+q, ctrl+c  sair
+?  ajuda
+=== conflitos ===
+conflicts=0
+conflict context=global key=s a=save b=search
+conflict context=list key=esc a=back b=cancel
+=== normalizacao ===
+"C-c" -> copy
+"Control+C" -> copy
+"escape" -> back
+"Esc" -> back
+"return" -> submit
+"spacebar" -> toggle
+" " -> toggle
+"del" -> remove
+"PageDown" -> page-down
+"pgdn" -> page-down
+"C-A-x" -> combo
+"alt+ctrl+x" -> combo
+"CTRL+ALT+X" -> combo
+"ctrl+├ç" -> cedilla-mod
+"├ç" -> none
+"A" -> upper
+"a" -> lower
+"f12" -> f12
+"ctrl+shift" -> none
+"" -> none
+"ctrl" -> none
+=== matches ===
+"C-c" matches=true
+"x" matches=false
+"" matches=false
+"├º" matches=true

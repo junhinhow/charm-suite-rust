@@ -6,7 +6,7 @@ use charmed_bubbletea::{Cmd, Message, Model, WindowSizeMsg};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenUpdate};
 
 /// A guard that may block `pop`.
 pub type Guard = Box<dyn Fn() -> (bool, Option<Cmd>) + Send>;
@@ -200,6 +200,12 @@ impl Router {
         self.lock().stack.len()
     }
 
+    /// Last known terminal dimensions, or `None` before the first resize.
+    pub fn size(&self) -> Option<(i32, i32)> {
+        let inner = self.lock();
+        inner.has_size.then_some((inner.width, inner.height))
+    }
+
     /// Titles from base to top.
     pub fn titles(&self) -> Vec<String> {
         let inner = self.lock();
@@ -208,6 +214,65 @@ impl Router {
             .iter()
             .map(|e| e.screen.as_ref().map(|s| s.title()).unwrap_or_default())
             .collect()
+    }
+
+    /// Renders screen titles as a width-limited breadcrumb (`A › … › Z`).
+    /// Titles are normalized to one line. Styling is left to the caller so the
+    /// returned string remains suitable for terminals and tests alike.
+    pub fn breadcrumb(&self, width: usize) -> String {
+        use unicode_width::UnicodeWidthStr;
+        if width == 0 {
+            return String::new();
+        }
+        let titles: Vec<String> = self
+            .titles()
+            .into_iter()
+            .map(|title| title.replace(['\n', '\r', '\t'], " "))
+            .collect();
+        if titles.is_empty() {
+            return String::new();
+        }
+        let full = titles.join(" › ");
+        if UnicodeWidthStr::width(full.as_str()) <= width {
+            return full;
+        }
+        let last = titles.last().expect("non-empty titles");
+        let truncate = |text: &str, max: usize| -> String {
+            let mut out = String::new();
+            let mut used = 0;
+            let reserve_ellipsis = UnicodeWidthStr::width(text) > max && max > 0;
+            let limit = if reserve_ellipsis { max - 1 } else { max };
+            for ch in text.chars() {
+                let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+                if used + cw > limit {
+                    break;
+                }
+                out.push(ch);
+                used += cw;
+            }
+            if out != text && max > 0 {
+                out.push('…');
+            }
+            out
+        };
+        if titles.len() == 1 {
+            return truncate(last, width);
+        }
+        let prefix = format!("{} › … › ", titles[0]);
+        if UnicodeWidthStr::width(prefix.as_str()) < width {
+            let candidate = format!(
+                "{prefix}{}",
+                truncate(last, width - UnicodeWidthStr::width(prefix.as_str()))
+            );
+            if UnicodeWidthStr::width(candidate.as_str()) <= width {
+                return candidate;
+            }
+        }
+        let short = format!("… › {last}");
+        if UnicodeWidthStr::width(short.as_str()) <= width {
+            return short;
+        }
+        truncate(last, width)
     }
 
     /// Sets a guard on the top screen.
@@ -300,13 +365,22 @@ impl Router {
         if !screen_present {
             return None;
         }
+        let generation = self.lock().gen;
         // call update on the screen
-        let cmd = {
+        let (update, cmd) = {
             let mut inner = self.lock();
             let last = inner.stack.len() - 1;
             let screen = inner.stack[last].screen.as_mut().unwrap();
             screen.update(msg)
         };
+        if let ScreenUpdate::Replace(next) = update {
+            let mut inner = self.lock();
+            // Do not overwrite a screen installed by navigation inside update.
+            if inner.gen == generation {
+                let last = inner.stack.len() - 1;
+                inner.stack[last].screen = Some(next);
+            }
+        }
         // process pending navigation
         let pending = {
             let inner = self.lock();

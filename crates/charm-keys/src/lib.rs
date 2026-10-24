@@ -16,7 +16,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use charmed_bubbletea::KeyMsg;
 
@@ -193,11 +193,33 @@ impl Resolver {
 
     /// Resolves a key message to an action.
     pub fn resolve(&self, msg: &KeyMsg) -> (String, bool) {
-        let key = normalize_key(&msg.to_string());
-        if key.is_empty() {
+        let text = msg.to_string();
+        let (action, found) = self.resolve_string(&text);
+        if found {
+            return (action, true);
+        }
+        let key = normalize_key(&text);
+        if key.starts_with("ctrl+") || key.starts_with("alt+") {
             return (String::new(), false);
         }
-        self.resolve_normalized(&key)
+        let key = match msg.key_type {
+            charmed_bubbletea::KeyType::CtrlC => "ctrl+c".to_owned(),
+            charmed_bubbletea::KeyType::CtrlD => "ctrl+d".to_owned(),
+            charmed_bubbletea::KeyType::CtrlZ => "ctrl+z".to_owned(),
+            charmed_bubbletea::KeyType::Runes if msg.runes.len() == 1 => {
+                let mut mods = Vec::new();
+                if msg.alt {
+                    mods.push("alt");
+                }
+                if mods.is_empty() {
+                    msg.runes[0].to_string()
+                } else {
+                    format!("{}+{}", mods.join("+"), msg.runes[0])
+                }
+            }
+            _ => key,
+        };
+        self.resolve_normalized(&normalize_key(&key))
     }
 
     /// Resolves a textual key such as `"ctrl+c"`.
@@ -246,96 +268,148 @@ impl Resolver {
 
     /// Effective help, one binding per line.
     pub fn help(&self) -> String {
-        self.help_width(0)
+        self.help_entries()
+            .iter()
+            .map(|(keys, desc)| format!("{keys}  {desc}"))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// Effective help laid out in columns of the given width.
     pub fn help_width(&self, width: usize) -> String {
-        // Collect effective bindings: top-down, first definition wins.
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-        let mut entries: Vec<(String, String)> = Vec::new(); // (keys, help)
-                                                             // walk from top context down to global
-        let mut contexts: Vec<&Context> = Vec::new();
+        let entries = self.help_entries();
+        if entries.is_empty() {
+            return String::new();
+        }
+        if width == 0 {
+            return String::new();
+        }
+        let labels: Vec<String> = entries.iter().map(|(k, d)| format!("{k}  {d}")).collect();
+        let max_width = labels.iter().map(|s| display_width(s)).max().unwrap_or(0);
+        let col_width = (max_width + 2).min(width);
+        let cols = (width / col_width).max(1).min(labels.len());
+        let rows = labels.len().div_ceil(cols);
+        let content_width = if cols > 1 {
+            col_width.saturating_sub(2)
+        } else {
+            width
+        };
+        let mut lines = Vec::new();
+        for row in 0..rows {
+            let mut line = String::new();
+            for col in 0..cols {
+                let i = col * rows + row;
+                if i >= labels.len() {
+                    break;
+                }
+                let cell = truncate(&labels[i], content_width);
+                line.push_str(&cell);
+                if i + rows < labels.len() {
+                    line.push_str(&" ".repeat(col_width.saturating_sub(display_width(&cell))));
+                }
+            }
+            lines.push(line.trim_end().to_owned());
+        }
+        lines.join("\n")
+    }
+
+    fn help_entries(&self) -> Vec<(String, String)> {
+        let contexts = self.priority_contexts();
+        let mut effective = HashMap::<String, String>::new();
+        for ctx in &contexts {
+            for (key, action) in &ctx.index {
+                effective
+                    .entry(key.clone())
+                    .or_insert_with(|| action.clone());
+            }
+        }
+        let mut actions = HashSet::new();
+        let mut entries = Vec::new();
+        for ctx in contexts {
+            for binding in &ctx.bindings {
+                if actions.contains(&binding.action) {
+                    continue;
+                }
+                let mut seen = HashSet::new();
+                let keys: Vec<_> = binding
+                    .keys
+                    .iter()
+                    .filter(|key| {
+                        let normalized = normalize_key(key);
+                        !normalized.is_empty()
+                            && effective.get(&normalized) == Some(&binding.action)
+                            && seen.insert(normalized)
+                    })
+                    .cloned()
+                    .collect();
+                if keys.is_empty() {
+                    continue;
+                }
+                let desc = if binding.help.trim().is_empty() {
+                    binding.action.clone()
+                } else {
+                    binding.help.clone()
+                };
+                actions.insert(binding.action.clone());
+                entries.push((keys.join(", "), desc));
+            }
+        }
+        entries
+    }
+
+    fn priority_contexts(&self) -> Vec<&Context> {
+        let mut contexts = Vec::new();
         for name in self.stack.iter().rev() {
             if let Some(ctx) = self.contexts.get(name) {
                 contexts.push(ctx);
             }
         }
-        if let Some(g) = &self.global {
-            contexts.push(g);
+        if let Some(global) = &self.global {
+            contexts.push(global);
         }
-        for ctx in contexts {
-            for binding in &ctx.bindings {
-                for key in &binding.keys {
-                    let nk = normalize_key(key);
-                    if nk.is_empty() {
-                        continue;
-                    }
-                    if !seen.insert(nk.clone()) {
-                        continue;
-                    }
-                    let keys = binding.keys.join("/");
-                    let help = if binding.help.is_empty() {
-                        binding.action.clone()
-                    } else {
-                        binding.help.clone()
-                    };
-                    entries.push((keys, help));
-                }
-            }
-        }
-        if entries.is_empty() {
-            return String::new();
-        }
-        if width == 0 {
-            let mut out = String::new();
-            for (keys, help) in &entries {
-                out.push_str(keys);
-                out.push_str(": ");
-                out.push_str(help);
-                out.push('\n');
-            }
-            return out;
-        }
-        // Column layout: best-effort, one entry per line for simplicity.
-        let mut out = String::new();
-        for (keys, help) in &entries {
-            out.push_str(keys);
-            out.push_str(": ");
-            out.push_str(help);
-            out.push('\n');
-        }
-        out
+        contexts
     }
 }
 
 fn collect_conflicts(ctx: &Context, out: &mut Vec<Conflict>) {
-    // For each normalized key, find distinct actions.
-    let mut by_key: HashMap<String, Vec<String>> = HashMap::new();
+    let mut seen = HashMap::<String, String>::new();
     for binding in &ctx.bindings {
         for key in &binding.keys {
             let nk = normalize_key(key);
             if nk.is_empty() {
                 continue;
             }
-            by_key.entry(nk).or_default().push(binding.action.clone());
-        }
-    }
-    for (key, actions) in by_key {
-        // distinct
-        let mut distinct: Vec<String> = Vec::new();
-        for a in actions {
-            if !distinct.contains(&a) {
-                distinct.push(a);
+            if let Some(first) = seen.get(&nk) {
+                if first != &binding.action {
+                    out.push(Conflict {
+                        context: ctx.name.clone(),
+                        key: nk,
+                        action_a: first.clone(),
+                        action_b: binding.action.clone(),
+                    });
+                }
+            } else {
+                seen.insert(nk, binding.action.clone());
             }
         }
-        if distinct.len() >= 2 {
-            out.push(Conflict {
-                context: ctx.name.clone(),
-                key,
-                action_a: distinct[0].clone(),
-                action_b: distinct[1].clone(),
-            });
-        }
     }
+}
+
+fn display_width(s: &str) -> usize {
+    s.chars()
+        .map(|c| if c as u32 >= 0x1100 { 2 } else { 1 })
+        .sum()
+}
+fn truncate(s: &str, width: usize) -> String {
+    let mut out = String::new();
+    let mut used = 0;
+    for c in s.chars() {
+        let w = if c as u32 >= 0x1100 { 2 } else { 1 };
+        if used + w > width {
+            break;
+        }
+        out.push(c);
+        used += w;
+    }
+    out
 }

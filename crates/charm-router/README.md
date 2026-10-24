@@ -11,7 +11,11 @@ charm-router = { git = "https://forgejo.multiservidores.com.br/ajr/CharmSuite-Ru
 
 ## Usage
 
-See the crate documentation and `examples/`.
+Screens implement `Screen`; their `update` returns `(ScreenUpdate, Option<Cmd>)`.
+Use `ScreenUpdate::Keep` to retain the current value or
+`ScreenUpdate::Replace(Box<dyn Screen>)` to return a replacement. The router
+also provides `push`, `pop`, `replace`, `reset`, guards, typed JSON parameters,
+sticky terminal size, titles/depth and `breadcrumb(width)`.
 
 ## License
 

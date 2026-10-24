@@ -8,16 +8,15 @@ use crate::router::NavRequest;
 
 /// A navigable screen.
 ///
-/// Mirrors the Go `Screen` interface. `update` mutates the screen in place and
-/// returns an optional command. Navigation is performed through the
-/// [`NavHandle`] returned by `nav_handle`, never by mutating the router
-/// directly.
+/// Mirrors the Go `Screen` interface. `update` may keep the current value or
+/// replace it, and returns a command. This models Go's `(Screen, Cmd)` while
+/// respecting Rust's ownership rules.
 pub trait Screen: Send + 'static {
     /// Called when the screen enters the stack.
     fn init(&self) -> Option<Cmd>;
 
     /// Processes a message and returns an optional command.
-    fn update(&mut self, msg: Message) -> Option<Cmd>;
+    fn update(&mut self, msg: Message) -> (ScreenUpdate, Option<Cmd>);
 
     /// Renders the screen.
     fn view(&self) -> String;
@@ -35,6 +34,15 @@ pub trait Screen: Send + 'static {
 
     /// Receives the handle used to navigate. Default is a no-op.
     fn set_nav_handle(&mut self, _handle: NavHandle) {}
+}
+
+/// The screen returned by an update operation.
+#[allow(missing_debug_implementations)]
+pub enum ScreenUpdate {
+    /// Keep the screen instance that received the message.
+    Keep,
+    /// Replace it with a new screen instance.
+    Replace(Box<dyn Screen>),
 }
 
 #[allow(missing_debug_implementations)]
