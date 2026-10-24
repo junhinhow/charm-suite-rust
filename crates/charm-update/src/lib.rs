@@ -842,7 +842,7 @@ fn is_doc(n: &str) -> bool {
 
 #[cfg(unix)]
 #[allow(clippy::needless_pass_by_value)]
-fn install(mut staged: tempfile::NamedTempFile, target: PathBuf) -> Result<()> {
+fn install(staged: tempfile::NamedTempFile, target: PathBuf) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     staged
         .as_file()
