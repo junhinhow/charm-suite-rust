@@ -1,6 +1,6 @@
 [package]
 name = "charm-fuzzy"
-description = "Fuzzy subsequence matching and a Bubble Tea picker for command palettes."
+description = "Fuzzy subsequence matching and highlighting for terminal UIs."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
