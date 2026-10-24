@@ -19,8 +19,8 @@ fn themes_integrate_with_layout() {
         .add_child(0.5, "sidebar")
         .add_child(0.5, "main");
 
-    // Tema não deve interferir na construção do layout
-    assert!(true, "Theme and Flex types are compatible");
+    // Se chegou aqui sem erro de compilação, os tipos são compatíveis
+    let _ = (_theme, _flex);
 }
 
 /// Valida que panes podem ser organizados em layouts.
@@ -45,7 +45,10 @@ fn panes_integrate_with_layout_system() {
 
     // Layout deve produzir view não vazia com 2 panes
     let view = layout.view();
-    assert!(!view.is_empty(), "Layout with 2 panes renders non-empty view");
+    assert!(
+        !view.is_empty(),
+        "Layout with 2 panes renders non-empty view"
+    );
 }
 
 /// Valida que charm-core text utilities funcionam com strings renderizadas.
@@ -64,8 +67,8 @@ fn core_text_works_with_rendered_content() {
 /// Valida que router e nav compartilham tipos compatíveis.
 #[test]
 fn router_and_nav_types_are_compatible() {
-    use charm_router::Router;
     use charm_nav::tabs::Tabs;
+    use charm_router::Router;
 
     // Tabs aceita &[&str]
     let _tabs = Tabs::new(&["Home", "Settings"]);
@@ -73,5 +76,6 @@ fn router_and_nav_types_are_compatible() {
     // Router pode ser instanciado sem root screen
     let _router = Router::new(None);
 
-    assert!(true, "Router and Tabs coexist without type conflicts");
+    // Se chegou aqui sem erro de compilação, os tipos são compatíveis
+    let _ = (_tabs, _router);
 }
