@@ -556,6 +556,16 @@ fn hsl_to_rgb(h: f64, s: f64, l: f64) -> (u8, u8, u8) {
 mod tests {
     use super::*;
 
+    /// Forca o perfil truecolor.
+    ///
+    /// O `lipgloss` guarda o token de cor no momento em que o estilo e
+    /// construido, e o token depende do perfil detectado. Em ambientes sem
+    /// TTY (CI) o perfil e `NoColor` e todos os tokens viram string vazia,
+    /// fazendo com que assercoes sobre escapes de cor falhem.
+    fn force_truecolor() {
+        lipgloss::renderer::set_color_profile(lipgloss::renderer::ColorProfileKind::TrueColor);
+    }
+
     fn plain(text: &str) -> String {
         charm_core::strip_ansi(text)
     }
@@ -614,6 +624,7 @@ mod tests {
 
     #[test]
     fn palette_label_uses_the_contrast_color() {
+        force_truecolor();
         let out = show_palette(&[Rgb::rgb(15, 23, 42)], 20);
         assert!(!out.contains("\x1b[38;2;15;23;42m"));
         assert!(out.contains("\x1b[38;2;255;255;255m"));
@@ -825,6 +836,7 @@ mod tests {
 
     #[test]
     fn theme_labels_use_the_contrast_color() {
+        force_truecolor();
         let mut colors = BTreeMap::new();
         colors.insert("dark".to_string(), Rgb::rgb(15, 23, 42));
         colors.insert("light".to_string(), Rgb::rgb(240, 230, 140));
