@@ -1,6 +1,6 @@
 # Gap Analysis — CharmSuite-Rust
 
-Data da última atualização: 2026-10-25. Commit de referência: `10a7e57`.
+Data da última atualização: 2026-10-25. Commit de referência: `cdc3b0d`.
 
 ## 1. Resumo
 
