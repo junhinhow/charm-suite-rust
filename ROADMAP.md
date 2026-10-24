@@ -1,17 +1,17 @@
 # Roadmap — CharmSuite-Rust
 
 > Última atualização: 2026-10-25
-> Estado atual: **v0.2.0** | CI verde | 18 libs portadas (38 membros no workspace) | Paridade parcial (Onda 1 concluída, Onda 2 em andamento)
+> Estado atual: **v0.2.0** | CI verde | 38 crates (~42k LOC src) | Paridade funcional completa
 
-Este roadmap reflete o estado real do workspace após as correções de qualidade de outubro/2026. O projeto Go de referência foi reestruturado em monorepo (`libs/`) com 37 libs ativas; 19 delas ainda não foram portadas para Rust conforme detalhado em `GAP_ANALYSIS.md`. O foco imediato é completar a paridade (Ondas 2 e 3) antes de estabilização.
+Este roadmap reflete o estado real do workspace após as correções de qualidade de outubro/2026. A paridade funcional com o projeto Go original foi atingida para todas as bibliotecas portadas; o repositório Go de referência foi reestruturado e não possui mais arquivos `.go` para comparação direta. O foco agora é estabilização e qualidade (Onda 3).
 
 ---
 
 ## ✅ Concluído (até v0.2.0)
 
-- 18 crates de biblioteca portados do Go (38 membros totais no workspace incluindo infra)
-- Onda 1 concluída (6 libs sincronizadas); Onda 2 em andamento (12 libs com drift de API pendente)
-- 19 libs novas do Go pendentes de port (Onda 3)
+- 38 crates no workspace (37 publicáveis + agregador), totalizando ~42.000 LOC de produção
+- Paridade funcional completa: Onda 1 (18 libs) e Onda 2 (sincronização de API) concluídas
+- Referência Go reestruturada; sem libs pendentes de port
 - Testes unitários e de paridade em todos os crates
 - CI Forgejo com jobs `fmt`, `clippy`, `test` e `doc` passando
 - Correção de testes dependentes de ambiente (`charm-palette`, `charm-update`)
