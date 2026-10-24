@@ -1,0 +1,14 @@
+[package]
+name = "charm-integration-tests"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+charm-themes = { path = "../../crates/charm-themes" }
+charm-palette = { path = "../../crates/charm-palette" }
+charm-layout = { path = "../../crates/charm-layout" }
+charm-panes = { path = "../../crates/charm-panes" }
+charm-router = { path = "../../crates/charm-router" }
+charm-nav = { path = "../../crates/charm-nav" }
+charm-core = { path = "../../crates/charm-core" }

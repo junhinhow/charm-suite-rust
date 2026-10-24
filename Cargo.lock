@@ -381,6 +381,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "charm-integration-tests"
+version = "0.0.0"
+dependencies = [
+ "charm-core",
+ "charm-layout",
+ "charm-nav",
+ "charm-palette",
+ "charm-panes",
+ "charm-router",
+ "charm-themes",
+]
+
+[[package]]
 name = "charm-json"
 version = "0.1.0"
 dependencies = [

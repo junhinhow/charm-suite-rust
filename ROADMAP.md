@@ -26,8 +26,8 @@ Este roadmap reflete o estado real do workspace após as correções de qualidad
 | # | Tarefa | Critério de Aceite | Prioridade |
 |---|--------|-------------------|------------|
 | 1 | Atualizar `GAP_ANALYSIS.md` | Sincronizar LOC/status reais da Onda 2; validar lista de 19 libs pendentes | Alta |
-| 2 | Adicionar job Linux nativo na CI | Job `ubuntu-latest` rodando clippy + test sem cross-compile | Alta |
-| 3 | Testes de integração entre crates | Suite `tests/integration/` cobrindo combos (themes+palette, layout+panes, router+nav) | Média |
+| 2 | ~~Adicionar job Linux nativo na CI~~ | ✅ Já atendido: `.github/workflows/ci.yml` roda test/clippy/fmt/doc em `ubuntu-latest` nativo | ~~Alta~~ |
+| 3 | ~~Testes de integração entre crates~~ | ✅ Suite `tests/integration/` criada com 4 testes passando (themes+layout, panes+layout, core+text, router+nav) | ~~Média~~ |
 | 4 | Benchmarks basais | `benches/` em charm-layout, charm-diff, charm-fuzzy com Criterion | Média |
 | 5 | Documentação API completa | `cargo doc --workspace` sem warnings; exemplos inline em todos os itens públicos | Média |
 | 6 | Exemplos funcionais executáveis | 1 exemplo por crate principal rodando com `cargo run --example` | Baixa |
